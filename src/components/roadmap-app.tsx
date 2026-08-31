@@ -113,6 +113,7 @@ const CURSOR = 1200;
 const RANGE_START = "2026-10-20";
 const RANGE_END = "2026-11-22";
 const SHORT_MONTH = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const PILL_PAGE = 4;
 
 const CITIES: City[] = [
   { id: "ny", name: "Nueva York", state: "Nueva York", coast: "este", lat: 40.71, lon: -74.01, low: 98.6666666666667, high: 98.6666666666667, source: "notion" },
@@ -1006,7 +1007,7 @@ function CityFloat({ grab, lifted }: { grab: Grab; lifted: boolean }) {
       >
         <div
           style={{
-            fontSize: 13,
+            fontSize: theme.type.sm,
             fontWeight: 600,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -1015,7 +1016,7 @@ function CityFloat({ grab, lifted }: { grab: Grab; lifted: boolean }) {
         >
           {city?.name ?? grab.city}
         </div>
-        <div style={{ fontSize: 11, opacity: 0.8, whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: theme.type.sm, opacity: 0.8, whiteSpace: "nowrap" }}>
           {Math.round(grab.days)}d
           {grab.event ? " · evento" : ""}
         </div>
@@ -1130,8 +1131,8 @@ function RideCard({ mark, lane }: { mark: RideMark; lane: number }) {
             gap: 8,
           }}
         >
-          <span style={{ fontSize: 12, fontWeight: 600 }}>{from}</span>
-          <span style={{ fontSize: 12, fontWeight: 600 }}>{to}</span>
+          <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{from}</span>
+          <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{to}</span>
         </div>
         <div
           style={{
@@ -1145,7 +1146,7 @@ function RideCard({ mark, lane }: { mark: RideMark; lane: number }) {
           <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={12} />
           <span
             style={{
-              fontSize: 11,
+              fontSize: theme.type.sm,
               fontVariantNumeric: "tabular-nums",
               color: theme.text.secondary,
             }}
@@ -1279,9 +1280,11 @@ function DateStep({
           display: "flex",
           alignItems: "center",
           gap: 4,
+          height: theme.control.height,
+          boxSizing: "border-box",
           background: theme.fill.secondary,
-          borderRadius: 8,
-          padding: "4px 6px",
+          borderRadius: theme.control.radius,
+          padding: "0 6px",
         }}
       >
         <IconButton
@@ -1293,6 +1296,7 @@ function DateStep({
           ‹
         </IconButton>
         <Text
+          size="small"
           weight="semibold"
           style={{
             minWidth: 64,
@@ -1480,7 +1484,7 @@ function RoadPills({
                     >
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: theme.type.sm,
                           fontWeight: 600,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -1489,7 +1493,7 @@ function RoadPills({
                       >
                         {city?.name ?? seg.stop.city}
                       </div>
-                      <div style={{ fontSize: 11, opacity: 0.8, whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: theme.type.sm, opacity: 0.8, whiteSpace: "nowrap" }}>
                         {dayLabel}
                         {event ? " · evento" : ""}
                       </div>
@@ -1629,8 +1633,10 @@ function AddCityChip({
         border: `1px solid ${theme.stroke.secondary}`,
         background: used ? "transparent" : theme.fill.secondary,
         color: used ? theme.text.tertiary : theme.text.primary,
-        borderRadius: 999,
-        padding: "6px 10px",
+        height: theme.control.height,
+        boxSizing: "border-box",
+        borderRadius: theme.control.radius,
+        padding: `0 ${theme.control.padX}px`,
         cursor: used ? "default" : grabbing ? "grabbing" : "grab",
         font: "inherit",
         opacity: grabbing ? 0.35 : 1,
@@ -1639,12 +1645,12 @@ function AddCityChip({
         whiteSpace: "nowrap",
       }}
     >
-      <Glyph kind="pin" color={used ? theme.text.tertiary : theme.text.secondary} size={14} />
-      <span style={{ fontSize: 13 }}>{city.name}</span>
+      <Glyph kind="pin" color={used ? theme.text.tertiary : theme.text.secondary} size={12} />
+      <span style={{ fontSize: theme.type.sm }}>{city.name}</span>
       {used ? (
-        <span style={{ fontSize: 11, color: theme.text.tertiary }}>{days}d</span>
+        <span style={{ fontSize: theme.type.sm, color: theme.text.tertiary }}>{days}d</span>
       ) : (
-        <Glyph kind="plus" color={theme.text.secondary} size={14} />
+        <Glyph kind="plus" color={theme.text.secondary} size={12} />
       )}
       {canRemove ? (
         <button
@@ -1692,6 +1698,7 @@ export default function RoadmapApp() {
   const [grab, setGrab] = useState<Grab | null>(null);
   const [focusCity, setFocusCity] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [pillPage, setPillPage] = useState(0);
   const [lifted, setLifted] = useState(false);
 
   useEffect(() => {
@@ -1748,11 +1755,14 @@ export default function RoadmapApp() {
   const pocketLow = stayLow + ticketsLow + extrasTotal - CURSOR;
   const pocketHigh = stayHigh + ticketsHigh + extrasTotal - CURSOR;
   const looking = query.trim().length > 0;
-  const visible = CITIES.filter((city) => {
+  const pool = CITIES.filter((city) => {
     if (looking) return cityMatches(city, query);
     if (filter !== "ambas" && city.coast !== filter) return false;
     return !active.some((stop) => stop.city === city.id);
-  }).slice(0, 4);
+  });
+  const pillPages = Math.max(1, Math.ceil(pool.length / PILL_PAGE));
+  const safePage = Math.min(pillPage, pillPages - 1);
+  const visible = pool.slice(safePage * PILL_PAGE, safePage * PILL_PAGE + PILL_PAGE);
 
   const slotFromEvent = (clientX: number) => slotAt(clientX, trackHost.current, active);
 
@@ -1913,40 +1923,58 @@ export default function RoadmapApp() {
               value={query}
               placeholder="Buscar ciudad"
               aria-label="Buscar ciudad"
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPillPage(0);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   setQuery("");
                   return;
                 }
                 if (event.key !== "Enter") return;
-                const first = visible.find((city) => !active.some((stop) => stop.city === city.id));
+                const first = pool.find((city) => !active.some((stop) => stop.city === city.id));
                 if (!first) return;
                 persist(insertTaking(active, active.length, first.id));
                 setQuery("");
+                setPillPage(0);
               }}
               style={{
                 width: "100%",
-                height: 34,
+                height: theme.control.height,
                 border: `1px solid ${theme.stroke.secondary}`,
-                borderRadius: 999,
+                borderRadius: theme.control.radius,
                 background: theme.bg.elevated,
                 color: theme.text.primary,
                 padding: "0 12px 0 30px",
                 font: "inherit",
-                fontSize: 13,
+                fontSize: theme.type.sm,
                 outline: "none",
               }}
             />
           </div>
           <Row gap={6} style={{ flexShrink: 0 }}>
             <span>
-              <Pill size="sm" active={filter === "este"} onClick={() => setFilter("este")}>
+              <Pill
+                size="sm"
+                active={filter === "este"}
+                onClick={() => {
+                  setFilter("este");
+                  setPillPage(0);
+                }}
+              >
                 Este
               </Pill>
             </span>
             <span>
-              <Pill size="sm" active={filter === "oeste"} onClick={() => setFilter("oeste")}>
+              <Pill
+                size="sm"
+                active={filter === "oeste"}
+                onClick={() => {
+                  setFilter("oeste");
+                  setPillPage(0);
+                }}
+              >
                 Oeste
               </Pill>
             </span>
@@ -1954,10 +1982,12 @@ export default function RoadmapApp() {
           <div
             style={{
               display: "flex",
-              flexWrap: "wrap",
+              flexWrap: "nowrap",
+              alignItems: "center",
               gap: 8,
               flex: "1 1 240px",
               justifyContent: "flex-end",
+              minWidth: 0,
             }}
           >
             {visible.length === 0 ? (
@@ -2007,6 +2037,15 @@ export default function RoadmapApp() {
                 );
               })
             )}
+            {pool.length > PILL_PAGE ? (
+              <IconButton
+                title="Más ciudades"
+                size="sm"
+                onClick={() => setPillPage((safePage + 1) % pillPages)}
+              >
+                ›
+              </IconButton>
+            ) : null}
           </div>
         </div>
       </div>

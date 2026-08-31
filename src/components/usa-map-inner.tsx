@@ -207,11 +207,39 @@ function HopLine({
   );
 }
 
-function cityIcon(order: number, name: string, hot: boolean) {
+const AIRPORT: Record<string, string> = {
+  ny: "JFK",
+  nwk: "EWR",
+  dc: "IAD",
+  phl: "PHL",
+  bos: "BOS",
+  chi: "ORD",
+  bal: "BWI",
+  mia: "MIA",
+  orl: "MCO",
+  tpa: "TPA",
+  atl: "ATL",
+  msy: "MSY",
+  sfo: "SFO",
+  lax: "LAX",
+  san: "SAN",
+  sea: "SEA",
+  pdx: "PDX",
+  las: "LAS",
+  phx: "PHX",
+};
+
+const PLANE_SVG = `<svg class="usa-city-plane" width="12" height="12" viewBox="0 0 24 24" fill="${theme.category.orange}"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`;
+
+function cityIcon(order: number, name: string, hot: boolean, airport?: string) {
+  const label = name.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const extra = airport
+    ? `${PLANE_SVG}<span class="usa-city-iata">${airport}</span>`
+    : "";
   return L.divIcon({
     className: "usa-city-mark",
-    html: `<span class="usa-city-badge${hot ? " is-hot" : ""}">${order}</span><span class="usa-city-name">${name.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`,
-    iconSize: [140, 28],
+    html: `<span class="usa-city-badge${hot ? " is-hot" : ""}">${order}</span><span class="usa-city-name">${label}${extra}</span>`,
+    iconSize: [200, 28],
     iconAnchor: [14, 14],
   });
 }
@@ -323,14 +351,22 @@ export default function UsaMapInner({
             />
           );
         })}
-        {stopsOnMap.map((city, index) => (
-          <Marker
-            key={`${city.id}-${index}`}
-            position={[city.lat, city.lon]}
-            icon={cityIcon(index + 1, city.name, heldFocus === city.id)}
-            interactive={false}
-          />
-        ))}
+        {stopsOnMap.map((city, index) => {
+          const gateway = index === 0 || index === stopsOnMap.length - 1;
+          return (
+            <Marker
+              key={`${city.id}-${index}`}
+              position={[city.lat, city.lon]}
+              icon={cityIcon(
+                index + 1,
+                city.name,
+                heldFocus === city.id,
+                gateway ? AIRPORT[city.id] : undefined,
+              )}
+              interactive={false}
+            />
+          );
+        })}
       </MapContainer>
     </div>
   );

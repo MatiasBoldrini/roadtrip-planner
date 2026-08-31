@@ -135,7 +135,7 @@ export function Text({
     <span
       style={{
         color: theme.text[tone],
-        fontSize: size === "small" ? 12 : 14,
+        fontSize: size === "small" ? theme.type.sm : theme.type.md,
         fontWeight: weight === "semibold" ? 600 : weight === "bold" ? 700 : weight === "medium" ? 500 : 400,
         lineHeight: 1.4,
         ...style,
@@ -151,7 +151,7 @@ export function H1({ children, style }: { children?: ReactNode; style?: CSSPrope
     <h1
       style={{
         margin: "4px 0 0",
-        fontSize: 28,
+        fontSize: theme.type.lg,
         fontWeight: 650,
         letterSpacing: "-0.03em",
         color: theme.text.primary,
@@ -168,7 +168,7 @@ export function H2({ children, style }: { children?: ReactNode; style?: CSSPrope
     <h2
       style={{
         margin: 0,
-        fontSize: 16,
+        fontSize: theme.type.md,
         fontWeight: 600,
         color: theme.text.primary,
         ...style,
@@ -225,10 +225,11 @@ export function Button({
       style={{
         border: "none",
         borderRadius: 8,
-        padding: "7px 12px",
+        padding: `${theme.control.padY}px ${theme.control.padX}px`,
         background: bg,
         color,
         font: "inherit",
+        fontSize: theme.type.sm,
         cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.45 : 1,
         ...style,
@@ -306,13 +307,15 @@ export function Pill({
       style={{
         display: "inline-flex",
         alignItems: "center",
+        boxSizing: "border-box",
+        minHeight: theme.control.height,
         border: "none",
-        borderRadius: 999,
-        padding: size === "sm" ? "3px 8px" : "5px 10px",
+        borderRadius: theme.control.radius,
+        padding: `${theme.control.padY}px ${theme.control.padX}px`,
         background: active ? theme.accent.primary : theme.fill.secondary,
         color: active ? theme.text.onAccent : theme.text.primary,
         font: "inherit",
-        fontSize: size === "sm" ? 12 : 13,
+        fontSize: theme.type.sm,
         cursor: onClick ? "pointer" : "default",
       }}
     >
@@ -345,13 +348,14 @@ export function TextInput({
       onChange={(event) => onChange?.(event.target.value)}
       style={{
         width: "100%",
-        height: 32,
+        height: theme.control.height,
         border: `1px solid ${theme.stroke.secondary}`,
         borderRadius: 8,
         background: theme.bg.elevated,
         color: theme.text.primary,
-        padding: "0 10px",
+        padding: `0 ${theme.control.padX}px`,
         font: "inherit",
+        fontSize: theme.type.sm,
         ...style,
       }}
     />
@@ -418,7 +422,7 @@ export function CardHeader({
         justifyContent: "space-between",
         gap: 8,
         padding: "10px 14px",
-        fontSize: 13,
+        fontSize: theme.type.md,
         fontWeight: 600,
         color: theme.text.primary,
       }}
@@ -464,7 +468,7 @@ export function Table({
 }) {
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: theme.type.sm }}>
         <thead>
           <tr>
             {headers.map((header, index) => (

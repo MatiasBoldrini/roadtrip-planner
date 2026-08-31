@@ -33,6 +33,17 @@ export const theme = {
   category: {
     orange: "#d9843a",
   },
+  type: {
+    sm: 12,
+    md: 14,
+    lg: 22,
+  },
+  control: {
+    height: 32,
+    padY: 6,
+    padX: 10,
+    radius: 999,
+  },
 } as const;
 
 export type HostTheme = typeof theme;

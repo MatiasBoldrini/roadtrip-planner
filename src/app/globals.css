@@ -66,6 +66,9 @@ input {
 }
 
 .usa-map .usa-city-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: #171717;
   font-size: 12px;
   font-weight: 650;
@@ -77,4 +80,15 @@ input {
     -1px 0 0 #fff,
     0 1px 0 #fff,
     0 -1px 0 #fff;
+}
+
+.usa-map .usa-city-plane {
+  display: block;
+  flex-shrink: 0;
+}
+
+.usa-map .usa-city-iata {
+  color: #8a8a8a;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
