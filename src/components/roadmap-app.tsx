@@ -1,11 +1,11 @@
 "use client";
 
+import { startTransition, ViewTransition, type ReactNode } from "react";
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
-  Divider,
   H1,
   H2,
   IconButton,
@@ -30,9 +30,7 @@ type Filter = "este" | "oeste" | "ambas";
 type Mode = "tren" | "vuelo" | "local";
 type Extra = { id: string; name: string; amount: number };
 
-const DEFAULT_EXTRAS: Extra[] = [
-  { id: "macbook-air", name: "MacBook Air", amount: 1500 },
-];
+const DEFAULT_EXTRAS: Extra[] = [];
 
 type City = {
   id: string;
@@ -574,19 +572,8 @@ function formatDay(iso: string) {
   return isWeekend(iso) ? `${label} ${WEEKDAY[weekday(iso)]}` : label;
 }
 
-function weekendNote(start: string, end: string) {
-  let days = 0;
-  for (let i = 0; i <= diffDays(end, start); i += 1) {
-    if (isWeekend(addDays(start, i))) days += 1;
-  }
-  if (days === 0) return "";
-  if (days === 1) return " · 1 día de finde";
-  return ` · ${days} días de finde`;
-}
-
 function formatSpan(start: string, end: string) {
-  const span = start === end ? formatDay(start) : `${formatDay(start)} – ${formatDay(end)}`;
-  return `${span}${weekendNote(start, end)}`;
+  return start === end ? formatDay(start) : `${formatDay(start)} – ${formatDay(end)}`;
 }
 
 function formatHours(value: number) {
@@ -629,8 +616,9 @@ function Glyph({
   };
   if (kind === "plane") {
     return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+      <svg {...common}>
+        <path d="M2 9.2h8.2L14 3.6 2 8V9.2z" />
+        <path d="M2 9.2 5.1 12.4M10.2 9.2 8.1 13.2" />
       </svg>
     );
   }
@@ -695,203 +683,227 @@ function hopKind(mode: Mode): "plane" | "train" | "local" {
   return "local";
 }
 
-function TimelineRail({
-  first,
-  last,
-  children,
+const MARK = 28;
+const MARK_GLYPH = 14;
+
+function GroupedCard({ children }: { children: ReactNode }) {
+  const theme = useHostTheme();
+  return (
+    <div
+      style={{
+        background: theme.fill.primary,
+        borderRadius: 12,
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Mark({
+  kind,
+  accent,
 }: {
-  first?: boolean;
-  last?: boolean;
-  children: ReturnType<typeof TripMark> | ReturnType<typeof Glyph> | null;
+  kind: "plane" | "train" | "local" | "pin" | "home";
+  accent?: boolean;
 }) {
   const theme = useHostTheme();
   return (
     <div
       style={{
-        width: 28,
-        flexShrink: 0,
+        width: MARK,
+        height: MARK,
+        borderRadius: 999,
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        background: accent ? theme.accent.primary : theme.fill.tertiary,
       }}
     >
-      <div
-        style={{
-          width: 1,
-          flex: first ? "0 0 8px" : 1,
-          background: first ? "transparent" : theme.stroke.secondary,
-        }}
-      />
-      {children}
-      <div
-        style={{
-          width: 1,
-          flex: last ? "0 0 8px" : 1,
-          background: last ? "transparent" : theme.stroke.secondary,
-        }}
+      <Glyph
+        kind={kind}
+        color={accent ? theme.text.onAccent : theme.text.secondary}
+        size={MARK_GLYPH}
       />
     </div>
   );
 }
 
-function ItinRow({
-  kind,
-  accent,
-  title,
-  detail,
-  date,
-  cost,
-  first,
-  last,
+function BillLine({
+  label,
+  amount,
+  kind = "item",
 }: {
-  kind: "plane" | "train" | "local" | "pin" | "home";
-  accent?: boolean;
-  title: string;
-  detail?: string;
-  date: string;
-  cost: string;
-  first?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <Row gap={12} align="stretch" justify="space-between">
-      <Text
-        size="small"
-        tone="tertiary"
-        style={{
-          width: 44,
-          flexShrink: 0,
-          paddingTop: 10,
-          textAlign: "right",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {date}
-      </Text>
-      <TimelineRail first={first} last={last}>
-        <TripMark kind={kind} accent={accent} />
-      </TimelineRail>
-      <div style={{ flex: 1, minWidth: 0, padding: "8px 0" }}>
-        <Text
-          weight="semibold"
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        >
-          {title}
-        </Text>
-        {detail ? (
-          <Text size="small" tone="tertiary">
-            {detail}
-          </Text>
-        ) : null}
-      </div>
-      <span style={{ paddingTop: 8 }}>
-        <Pill size="sm">{cost}</Pill>
-      </span>
-    </Row>
-  );
-}
-
-function ItinHop({
-  from,
-  to,
-  dest,
-  kind,
-  hours,
-  date,
-  cost,
-  first,
-  last,
-}: {
-  from: string;
-  to: string;
-  dest: string;
-  kind: "plane" | "train" | "local" | "home";
-  hours: string;
-  date: string;
-  cost: string;
-  first?: boolean;
-  last?: boolean;
+  label: string;
+  amount: string;
+  kind?: "section" | "item" | "foot";
 }) {
   const theme = useHostTheme();
-  return (
-    <Row gap={12} align="stretch" justify="space-between">
-      <Text
-        size="small"
-        tone="tertiary"
-        style={{
-          width: 44,
-          flexShrink: 0,
-          paddingTop: 10,
-          textAlign: "right",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {date}
-      </Text>
-      <TimelineRail first={first} last={last}>
-        <div
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 999,
-            background: theme.fill.secondary,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Glyph kind={kind} color={theme.text.secondary} size={12} />
-        </div>
-      </TimelineRail>
-      <div style={{ flex: 1, minWidth: 0, padding: "8px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Text size="small" weight="semibold" style={{ flexShrink: 0 }}>
-            {from}
-          </Text>
-          <div style={{ flex: 1, height: 1, minWidth: 12, background: theme.stroke.secondary }} />
-          <Text size="small" style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-            {hours}
-          </Text>
-          <div style={{ flex: 1, height: 1, minWidth: 12, background: theme.stroke.secondary }} />
-          <Text size="small" weight="semibold" style={{ flexShrink: 0 }}>
-            {to}
-          </Text>
-        </div>
-        <Text size="small" tone="tertiary">
-          {dest}
-        </Text>
-      </div>
-      <span style={{ paddingTop: 8 }}>
-        <Pill size="sm">{cost}</Pill>
-      </span>
-    </Row>
-  );
-}
-
-function TripMark({
-  kind,
-  accent,
-}: {
-  kind: "plane" | "train" | "local" | "pin" | "home";
-  accent?: boolean;
-}) {
-  const theme = useHostTheme();
-  const color = accent ? theme.text.onAccent : theme.text.secondary;
+  const item = kind === "item";
+  const foot = kind === "foot";
   return (
     <div
       style={{
-        width: 28,
-        height: 28,
-        borderRadius: 8,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        background: accent ? theme.accent.primary : theme.fill.secondary,
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        gap: 32,
+        padding: foot ? "14px 0 0" : item ? "4px 0 4px 14px" : "12px 0 4px",
+        borderTop: foot ? `1px solid ${theme.stroke.secondary}` : undefined,
       }}
     >
-      <Glyph kind={kind} color={color} />
+      <Text
+        size={foot ? undefined : "small"}
+        weight={item ? undefined : "semibold"}
+        tone={item ? "tertiary" : "primary"}
+      >
+        {label}
+      </Text>
+      <Text
+        size={foot ? undefined : "small"}
+        weight={item ? undefined : "semibold"}
+        tone={item ? "tertiary" : "primary"}
+        style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
+      >
+        {amount}
+      </Text>
+    </div>
+  );
+}
+
+function ListRow({
+  icon,
+  title,
+  subtitle,
+  trailing,
+  last,
+  strong,
+  indent,
+}: {
+  icon?: ReactNode;
+  title: string;
+  subtitle?: string;
+  trailing?: string;
+  last?: boolean;
+  strong?: boolean;
+  indent?: boolean;
+}) {
+  const theme = useHostTheme();
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        minHeight: 52,
+        padding: indent ? "10px 16px 10px 56px" : "10px 16px",
+        borderBottom: last ? "none" : `1px solid ${theme.stroke.tertiary}`,
+      }}
+    >
+      {icon}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          size={indent ? "small" : undefined}
+          weight={strong ? "semibold" : indent ? undefined : "medium"}
+          tone={indent ? "secondary" : "primary"}
+          style={{
+            display: "block",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text
+            size="small"
+            tone="tertiary"
+            style={{
+              display: "block",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </div>
+      {trailing ? (
+        <Text
+          size="small"
+          weight={strong ? "semibold" : undefined}
+          tone={strong ? "primary" : "secondary"}
+          style={{
+            flexShrink: 0,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {trailing}
+        </Text>
+      ) : null}
+    </div>
+  );
+}
+
+function HopSep({
+  title,
+  subtitle,
+  cost,
+}: {
+  title: string;
+  subtitle: string;
+  cost: string;
+}) {
+  const theme = useHostTheme();
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "8px 16px 8px 22px",
+        background: "transparent",
+      }}
+    >
+      <svg
+        width={20}
+        height={40}
+        viewBox="0 0 20 40"
+        fill="none"
+        aria-hidden
+        style={{ flexShrink: 0 }}
+      >
+        <path
+          d="M6 1C6 10 16 13 16 20C16 27 6 30 6 39"
+          stroke={theme.stroke.primary}
+          strokeWidth="1.5"
+          strokeDasharray="2.2 3.2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          size="small"
+          tone="secondary"
+          style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {title}
+        </Text>
+        <Text
+          size="small"
+          tone="tertiary"
+          style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {subtitle}
+        </Text>
+      </div>
+      <Text size="small" tone="tertiary" style={{ flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+        {cost}
+      </Text>
     </div>
   );
 }
@@ -925,8 +937,8 @@ function TrimHandle({
         style={{
           width: 8,
           height: 22,
-          borderRadius: 3,
-          background: onAccent ? theme.fill.tertiary : theme.fill.primary,
+          border: "none",
+          background: "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -1088,7 +1100,7 @@ function RideScale({ mark }: { mark: RideMark }) {
   );
 }
 
-function RideCard({ mark, lane }: { mark: RideMark; lane: number }) {
+function RideCard({ mark }: { mark: RideMark }) {
   const theme = useHostTheme();
   const from = cityCode(mark.ride.from);
   const to = cityCode(mark.ride.to);
@@ -1110,7 +1122,7 @@ function RideCard({ mark, lane }: { mark: RideMark; lane: number }) {
       <div
         style={{
           width: 1,
-          height: lane === 0 ? 14 : 42,
+          height: 14,
           background: rideTint(theme, 45),
         }}
       />
@@ -1537,7 +1549,7 @@ function RoadPills({
       <div
         style={{
           position: "relative",
-          minHeight: marks.length > 2 ? 108 : 80,
+          minHeight: 80,
           marginTop: 2,
         }}
       >
@@ -1546,9 +1558,9 @@ function RoadPills({
             <RideScale mark={mark} />
           </div>
         ))}
-        {marks.map((mark, index) => (
+        {marks.map((mark) => (
           <div key={`card-${mark.ride.key}`}>
-            <RideCard mark={mark} lane={index % 2} />
+            <RideCard mark={mark} />
           </div>
         ))}
       </div>
@@ -1556,40 +1568,6 @@ function RoadPills({
   );
 }
 
-function LineItem({
-  left,
-  right,
-  quiet,
-  indent,
-}: {
-  left: string;
-  right: string;
-  quiet?: boolean;
-  indent?: boolean;
-}) {
-  return (
-    <Row
-      justify="space-between"
-      align="center"
-      style={indent ? { paddingLeft: 18 } : undefined}
-    >
-      <Text
-        size={indent ? "small" : undefined}
-        tone={quiet || indent ? "secondary" : "primary"}
-      >
-        {left}
-      </Text>
-      <Text
-        size={indent ? "small" : undefined}
-        weight={quiet || indent ? undefined : "semibold"}
-        tone={quiet || indent ? "secondary" : "primary"}
-        style={{ fontVariantNumeric: "tabular-nums" }}
-      >
-        {right}
-      </Text>
-    </Row>
-  );
-}
 
 function AddCityChip({
   city,
@@ -1686,10 +1664,16 @@ function AddCityChip({
 export default function RoadmapApp() {
   const theme = useHostTheme();
   const [filter, setFilter] = useCanvasState<Filter>("filter", "este");
-  const [preset, setPreset] = useCanvasState("preset", "A");
   const [stops, setStops] = useCanvasState<Stop[]>("stops", PRESETS.A.stops);
   const [tripStart, setTripStart] = useCanvasState("tripStart", "");
-  const [extras, setExtras] = useCanvasState<Extra[]>("extras", DEFAULT_EXTRAS);
+  const [storedExtras, setExtras] = useCanvasState<Extra[]>("extras", DEFAULT_EXTRAS);
+  const extras = storedExtras.filter((item) => item.id !== "macbook-air");
+
+  useEffect(() => {
+    if (storedExtras.some((item) => item.id === "macbook-air")) {
+      setExtras(storedExtras.filter((item) => item.id !== "macbook-air"));
+    }
+  }, [storedExtras]);
   const [legacy] = useCanvasState<Block[]>("blocks", []);
   const dragRef = useRef<Drag | null>(null);
   const trackHost = useRef<HTMLDivElement>(null);
@@ -1722,7 +1706,6 @@ export default function RoadmapApp() {
   const start = holdsEvent(active, rawStart) ? rawStart : clampStart(rawStart, active);
   const blocks = layoutFrom(preview, start);
   const persist = (next: Stop[], nextStart?: string) => {
-    setPreset("libre");
     const safe = ensureNy(next);
     const keep = nextStart ?? (tripStart || start);
     setStops(safe);
@@ -1995,7 +1978,7 @@ export default function RoadmapApp() {
                 {looking ? "Ninguna ciudad coincide." : "No quedan sugerencias en esta costa."}
               </Text>
             ) : (
-              visible.map((city) => {
+              visible.map((city, index) => {
                 const used = active.some((stop) => stop.city === city.id);
                 const days = active
                   .filter((stop) => stop.city === city.id)
@@ -2003,37 +1986,43 @@ export default function RoadmapApp() {
                 const lastNy =
                   city.id === "ny" && active.filter((stop) => stop.city === "ny").length === 1;
                 return (
-                  <AddCityChip
+                  <ViewTransition
                     key={city.id}
-                    city={city}
-                    used={used}
-                    days={days}
-                    canRemove={used && !lastNy}
-                    grabbing={grab?.kind === "add" && grab.city === city.id}
-                    onFocus={() => setFocusCity(city.id)}
-                    onBlur={() => setFocusCity(null)}
-                    onDragStart={(event) => {
-                      dragRef.current = { kind: "add", city: city.id };
-                      const next = startGrab(event, event.currentTarget, {
-                        kind: "add",
-                        city: city.id,
-                        days: 3,
-                        event: false,
-                        from: null,
-                      });
-                      if (next) setGrab(next);
-                    }}
-                    onRemove={() => {
-                      let index = -1;
-                      for (let i = active.length - 1; i >= 0; i -= 1) {
-                        if (active[i]?.city === city.id) {
-                          index = i;
-                          break;
+                    name={`pill-slot-${index}`}
+                    share="pill-morph"
+                    default="none"
+                  >
+                    <AddCityChip
+                      city={city}
+                      used={used}
+                      days={days}
+                      canRemove={used && !lastNy}
+                      grabbing={grab?.kind === "add" && grab.city === city.id}
+                      onFocus={() => setFocusCity(city.id)}
+                      onBlur={() => setFocusCity(null)}
+                      onDragStart={(event) => {
+                        dragRef.current = { kind: "add", city: city.id };
+                        const next = startGrab(event, event.currentTarget, {
+                          kind: "add",
+                          city: city.id,
+                          days: 3,
+                          event: false,
+                          from: null,
+                        });
+                        if (next) setGrab(next);
+                      }}
+                      onRemove={() => {
+                        let index = -1;
+                        for (let i = active.length - 1; i >= 0; i -= 1) {
+                          if (active[i]?.city === city.id) {
+                            index = i;
+                            break;
+                          }
                         }
-                      }
-                      if (index >= 0) persist(removeGiving(active, index));
-                    }}
-                  />
+                        if (index >= 0) persist(removeGiving(active, index));
+                      }}
+                    />
+                  </ViewTransition>
                 );
               })
             )}
@@ -2041,7 +2030,11 @@ export default function RoadmapApp() {
               <IconButton
                 title="Más ciudades"
                 size="sm"
-                onClick={() => setPillPage((safePage + 1) % pillPages)}
+                onClick={() => {
+                  startTransition(() => {
+                    setPillPage((safePage + 1) % pillPages);
+                  });
+                }}
               >
                 ›
               </IconButton>
@@ -2094,175 +2087,158 @@ export default function RoadmapApp() {
           }
           onRemove={(index) => persist(removeGiving(active, index))}
         />
-        <Text size="small" tone="tertiary" style={{ marginTop: 10 }}>
-          Achicar una ciudad agranda la de al lado: las fechas de
-          llegada y salida no se mueven. Click derecho para sacar.
-        </Text>
       </div>
-
-      <Row gap={6} wrap>
-        {Object.entries(PRESETS).map(([id, item]) => (
-          <span key={id}>
-            <Pill
-              size="sm"
-              active={preset === id}
-              onClick={() => {
-                setPreset(id);
-                setStops(item.stops);
-                setTripStart(startForEvent(item.stops));
-                if (id === "oeste") setFilter("oeste");
-                else if (id !== "libre") setFilter("este");
-              }}
-            >
-              {item.label}
-            </Pill>
-          </span>
-        ))}
-      </Row>
 
       <div>
         <H2>Itinerario</H2>
-        <Stack gap={2} style={{ marginTop: 14 }}>
-          {firstCity && first ? (
-            <ItinHop
-              first
-              kind="plane"
-              from="MDZ"
-              to={cityCode(firstCity.id)}
-              dest={firstCity.name}
-              hours={formatHours(inbound.hours)}
-              date={formatDay(first.start)}
-              cost={formatRange(intlLow, intlHigh)}
-            />
-          ) : null}
-
-          {blocks.map((block, index) => {
-            const city = cityById(block.city);
-            if (!city) return null;
-            const incoming = index > 0 ? routeHops[index - 1] : null;
-            const stay =
-              city.source === "notion"
-                ? usd(city.low * block.days)
-                : formatRange(city.low * block.days, city.high * block.days);
-            const event = covers(block, EVENT);
-            return (
-              <div key={`${block.city}-${block.start}`}>
-                {incoming ? (
-                  <ItinHop
-                    kind={hopKind(incoming.hop.mode)}
-                    from={cityCode(incoming.from)}
-                    to={cityCode(incoming.to)}
-                    dest={cityById(incoming.to)?.name ?? incoming.to}
-                    hours={formatHours(incoming.hop.hours)}
-                    date={formatDay(block.start)}
-                    cost={formatRange(incoming.hop.costLow, incoming.hop.costHigh)}
-                  />
-                ) : null}
-                <ItinRow
-                  kind="pin"
-                  accent={event}
-                  title={city.name}
-                  date={formatDay(block.start)}
-                  detail={formatSpan(block.start, endOf(block))}
-                  cost={stay}
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+          {(() => {
+            const rows: Array<{
+              key: string;
+              hop: boolean;
+              kind: "plane" | "train" | "local" | "pin";
+              title: string;
+              subtitle: string;
+              cost: string;
+              accent?: boolean;
+            }> = [];
+            if (firstCity && first) {
+              rows.push({
+                key: "in",
+                hop: true,
+                kind: "plane",
+                title: `MDZ → ${cityCode(firstCity.id)}`,
+                subtitle: `${formatDay(first.start)} · ${formatHours(inbound.hours)} · ${firstCity.name}`,
+                cost: formatRange(intlLow, intlHigh),
+              });
+            }
+            blocks.forEach((block, index) => {
+              const city = cityById(block.city);
+              if (!city) return;
+              const incoming = index > 0 ? routeHops[index - 1] : null;
+              if (incoming) {
+                rows.push({
+                  key: `hop-${incoming.from}-${incoming.to}`,
+                  hop: true,
+                  kind: hopKind(incoming.hop.mode),
+                  title: `${cityCode(incoming.from)} → ${cityCode(incoming.to)}`,
+                  subtitle: `${formatDay(block.start)} · ${formatHours(incoming.hop.hours)} · ${city.name}`,
+                  cost: formatRange(incoming.hop.costLow, incoming.hop.costHigh),
+                });
+              }
+              const stay =
+                city.source === "notion"
+                  ? usd(city.low * block.days)
+                  : formatRange(city.low * block.days, city.high * block.days);
+              const event = covers(block, EVENT);
+              rows.push({
+                key: `stay-${block.city}-${block.start}`,
+                hop: false,
+                kind: "pin",
+                title: city.name,
+                subtitle: `${formatSpan(block.start, endOf(block))}${event ? " · evento" : ""}`,
+                cost: stay,
+                accent: event,
+              });
+            });
+            if (lastCity && last) {
+              rows.push({
+                key: "out",
+                hop: true,
+                kind: "plane",
+                title: `${cityCode(lastCity.id)} → MDZ`,
+                subtitle: `${formatDay(endOf(last))} · ${formatHours(outbound.hours)} · Mendoza`,
+                cost: openIn ? formatRange(120, 220) : "incluido",
+              });
+            }
+            return rows.map((row) =>
+              row.hop ? (
+                <HopSep
+                  key={row.key}
+                  title={row.title}
+                  subtitle={row.subtitle}
+                  cost={row.cost}
                 />
-              </div>
+              ) : (
+                <GroupedCard key={row.key}>
+                  <ListRow
+                    icon={<Mark kind="pin" accent={row.accent} />}
+                    title={row.title}
+                    subtitle={row.subtitle}
+                    trailing={row.cost}
+                    last
+                  />
+                </GroupedCard>
+              ),
             );
-          })}
-
-          {lastCity && last ? (
-            <ItinHop
-              last
-              kind="plane"
-              from={cityCode(lastCity.id)}
-              to="MDZ"
-              dest="Mendoza"
-              hours={formatHours(outbound.hours)}
-              date={formatDay(endOf(last))}
-              cost={openIn ? formatRange(120, 220) : "incluido"}
-            />
-          ) : null}
-        </Stack>
+          })()}
+        </div>
       </div>
 
       <div>
         <H2>Cuentas</H2>
-        <Stack gap={10} style={{ maxWidth: 480, marginTop: 14 }}>
-          <div>
-            <LineItem left="Dormir y comer" right={formatRange(stayLow, stayHigh)} quiet />
-            <Stack gap={4} style={{ marginTop: 6 }}>
-              {blocks.map((block) => {
-                const city = cityById(block.city);
-                if (!city) return null;
-                const stay =
-                  city.source === "notion"
-                    ? usd(city.low * block.days)
-                    : formatRange(city.low * block.days, city.high * block.days);
-                return (
-                  <div key={`${block.city}-${block.start}-stay`}>
-                    <LineItem
-                      indent
-                      left={`${city.name} · ${block.days}d`}
-                      right={stay}
-                    />
-                  </div>
-                );
-              })}
-            </Stack>
-          </div>
-          <div>
-            <LineItem
-              left={`Viaje · ${formatHours(travelHours)}`}
-              right={formatRange(ticketsLow, ticketsHigh)}
-              quiet
-            />
-            <Stack gap={4} style={{ marginTop: 6 }}>
-              <LineItem
-                indent
-                left={`MDZ → ${cityCode(firstCity?.id ?? "ny")}`}
-                right={formatRange(intlLow, intlHigh)}
-              />
-              {routeHops.map((item) => (
-                <div key={`${item.from}-${item.to}`}>
-                  <LineItem
-                    indent
-                    left={`${cityCode(item.from)} → ${cityCode(item.to)}`}
-                    right={formatRange(item.hop.costLow, item.hop.costHigh)}
-                  />
-                </div>
-              ))}
-              <LineItem
-                indent
-                left={`${cityCode(lastCity?.id ?? "ny")} → MDZ`}
-                right={openIn ? formatRange(120, 220) : "incluido"}
-              />
-            </Stack>
-          </div>
-          {extras.some((item) => item.name || item.amount) ? (
-            <div>
-              <LineItem left="Gastos extra" right={usd(extrasTotal)} quiet />
-              <Stack gap={4} style={{ marginTop: 6 }}>
-                {extras
-                  .filter((item) => item.name || item.amount)
-                  .map((item) => (
-                    <div key={item.id}>
-                      <LineItem
-                        indent
-                        left={item.name || "Sin nombre"}
-                        right={usd(item.amount)}
-                      />
-                    </div>
-                  ))}
-              </Stack>
-            </div>
-          ) : null}
-          <LineItem left="Cursor cubre" right={`− ${usd(CURSOR)}`} quiet />
-          <Divider />
-          <LineItem
-            left="Tu parte"
-            right={formatRange(Math.max(0, pocketLow), Math.max(0, pocketHigh))}
+        <div style={{ maxWidth: 420, marginTop: 8 }}>
+          <BillLine
+            kind="section"
+            label="Dormir y comer"
+            amount={formatRange(stayLow, stayHigh)}
           />
-        </Stack>
+          {blocks.map((block) => {
+            const city = cityById(block.city);
+            if (!city) return null;
+            const stay =
+              city.source === "notion"
+                ? usd(city.low * block.days)
+                : formatRange(city.low * block.days, city.high * block.days);
+            return (
+              <BillLine
+                key={`${block.city}-${block.start}-stay`}
+                label={`${city.name} · ${block.days}d`}
+                amount={stay}
+              />
+            );
+          })}
+          <BillLine
+            kind="section"
+            label={`Viaje · ${formatHours(travelHours)}`}
+            amount={formatRange(ticketsLow, ticketsHigh)}
+          />
+          <BillLine
+            label={`MDZ → ${cityCode(firstCity?.id ?? "ny")}`}
+            amount={formatRange(intlLow, intlHigh)}
+          />
+          {routeHops.map((item) => (
+            <BillLine
+              key={`${item.from}-${item.to}`}
+              label={`${cityCode(item.from)} → ${cityCode(item.to)}`}
+              amount={formatRange(item.hop.costLow, item.hop.costHigh)}
+            />
+          ))}
+          <BillLine
+            label={`${cityCode(lastCity?.id ?? "ny")} → MDZ`}
+            amount={openIn ? formatRange(120, 220) : "incluido"}
+          />
+          {extras.some((item) => item.name || item.amount) ? (
+            <>
+              <BillLine kind="section" label="Gastos extra" amount={usd(extrasTotal)} />
+              {extras
+                .filter((item) => item.name || item.amount)
+                .map((item) => (
+                  <BillLine
+                    key={item.id}
+                    label={item.name || "Sin nombre"}
+                    amount={usd(item.amount)}
+                  />
+                ))}
+            </>
+          ) : null}
+          <BillLine kind="section" label="Cursor cubre" amount={`− ${usd(CURSOR)}`} />
+          <BillLine
+            kind="foot"
+            label="Tu parte"
+            amount={formatRange(Math.max(0, pocketLow), Math.max(0, pocketHigh))}
+          />
+        </div>
       </div>
 
       <div>
