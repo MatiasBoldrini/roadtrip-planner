@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+}
+
+html,
+body {
+  background: #ffffff;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+.usa-map .usa-route-arrow,
+.usa-map .usa-city-mark {
+  background: none !important;
+  border: none !important;
+}
+
+.usa-map .usa-route-arrow-inner {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  transform-origin: 50% 50%;
+}
+
+.usa-map .usa-city-mark {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.usa-map .usa-city-badge {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #d9843a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+}
+
+.usa-map .usa-city-badge.is-hot {
+  background: #3d6b9e;
+}
+
+.usa-map .usa-city-name {
+  color: #171717;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 6px #fff,
+    1px 0 0 #fff,
+    -1px 0 0 #fff,
+    0 1px 0 #fff,
+    0 -1px 0 #fff;
+}
