@@ -24,9 +24,9 @@ import {
 } from "@/lib/canvas-compat";
 import { UsaMap } from "@/components/usa-map";
 
-type Coast = "este" | "oeste";
+type Coast = "este" | "oeste" | "sur" | "escala";
 type Source = "notion" | "estimado";
-type Filter = "este" | "oeste" | "ambas";
+type Filter = Coast | "ambas" | "mexico";
 type Mode = "tren" | "vuelo" | "local";
 type Extra = { id: string; name: string; amount: number };
 
@@ -127,16 +127,27 @@ const CITIES: City[] = [
   { id: "buf", name: "Niagara", state: "Nueva York", coast: "este", lat: 43.1, lon: -79.05, low: 55, high: 90, source: "estimado" },
   { id: "pit", name: "Pittsburgh", state: "Pennsylvania", coast: "este", lat: 40.44, lon: -80, low: 55, high: 90, source: "estimado" },
   { id: "ric", name: "Richmond", state: "Virginia", coast: "este", lat: 37.54, lon: -77.44, low: 60, high: 95, source: "estimado" },
-  { id: "rdu", name: "Raleigh", state: "Carolina del Norte", coast: "este", lat: 35.78, lon: -78.64, low: 60, high: 95, source: "estimado" },
-  { id: "clt", name: "Charlotte", state: "Carolina del Norte", coast: "este", lat: 35.23, lon: -80.84, low: 70, high: 105, source: "estimado" },
-  { id: "chs", name: "Charleston", state: "Carolina del Sur", coast: "este", lat: 32.78, lon: -79.93, low: 80, high: 120, source: "estimado" },
-  { id: "sav", name: "Savannah", state: "Georgia", coast: "este", lat: 32.08, lon: -81.09, low: 70, high: 105, source: "estimado" },
-  { id: "atl", name: "Atlanta", state: "Georgia", coast: "este", lat: 33.75, lon: -84.39, low: 65, high: 100, source: "estimado" },
-  { id: "mia", name: "Miami", state: "Florida", coast: "este", lat: 25.76, lon: -80.19, low: 85, high: 130, source: "estimado" },
-  { id: "orl", name: "Orlando", state: "Florida", coast: "este", lat: 28.54, lon: -81.38, low: 70, high: 110, source: "estimado" },
-  { id: "tpa", name: "Tampa", state: "Florida", coast: "este", lat: 27.95, lon: -82.46, low: 70, high: 110, source: "estimado" },
-  { id: "msy", name: "Nueva Orleans", state: "Luisiana", coast: "este", lat: 29.95, lon: -90.07, low: 75, high: 115, source: "estimado" },
-  { id: "bna", name: "Nashville", state: "Tennessee", coast: "este", lat: 36.16, lon: -86.78, low: 75, high: 115, source: "estimado" },
+  { id: "rdu", name: "Raleigh", state: "Carolina del Norte", coast: "sur", lat: 35.78, lon: -78.64, low: 60, high: 95, source: "estimado" },
+  { id: "clt", name: "Charlotte", state: "Carolina del Norte", coast: "sur", lat: 35.23, lon: -80.84, low: 70, high: 105, source: "estimado" },
+  { id: "chs", name: "Charleston", state: "Carolina del Sur", coast: "sur", lat: 32.78, lon: -79.93, low: 80, high: 120, source: "estimado" },
+  { id: "sav", name: "Savannah", state: "Georgia", coast: "sur", lat: 32.08, lon: -81.09, low: 70, high: 105, source: "estimado" },
+  { id: "atl", name: "Atlanta", state: "Georgia", coast: "sur", lat: 33.75, lon: -84.39, low: 65, high: 100, source: "estimado" },
+  { id: "mia", name: "Miami", state: "Florida", coast: "sur", lat: 25.76, lon: -80.19, low: 85, high: 130, source: "estimado" },
+  { id: "orl", name: "Orlando", state: "Florida", coast: "sur", lat: 28.54, lon: -81.38, low: 70, high: 110, source: "estimado" },
+  { id: "tpa", name: "Tampa", state: "Florida", coast: "sur", lat: 27.95, lon: -82.46, low: 70, high: 110, source: "estimado" },
+  { id: "jax", name: "Jacksonville", state: "Florida", coast: "sur", lat: 30.33, lon: -81.66, low: 60, high: 95, source: "estimado" },
+  { id: "fll", name: "Fort Lauderdale", state: "Florida", coast: "sur", lat: 26.12, lon: -80.14, low: 75, high: 120, source: "estimado" },
+  { id: "eyw", name: "Key West", state: "Florida", coast: "sur", lat: 24.56, lon: -81.78, low: 95, high: 150, source: "estimado" },
+  { id: "ust", name: "San Agustín", state: "Florida", coast: "sur", lat: 29.89, lon: -81.31, low: 70, high: 110, source: "estimado" },
+  { id: "msy", name: "Nueva Orleans", state: "Luisiana", coast: "sur", lat: 29.95, lon: -90.07, low: 75, high: 115, source: "estimado" },
+  { id: "bna", name: "Nashville", state: "Tennessee", coast: "sur", lat: 36.16, lon: -86.78, low: 75, high: 115, source: "estimado" },
+  { id: "mem", name: "Memphis", state: "Tennessee", coast: "sur", lat: 35.15, lon: -90.05, low: 55, high: 90, source: "estimado" },
+  { id: "aus", name: "Austin", state: "Texas", coast: "sur", lat: 30.27, lon: -97.74, low: 70, high: 110, source: "estimado" },
+  { id: "hou", name: "Houston", state: "Texas", coast: "sur", lat: 29.76, lon: -95.37, low: 60, high: 95, source: "estimado" },
+  { id: "sat", name: "San Antonio", state: "Texas", coast: "sur", lat: 29.42, lon: -98.49, low: 55, high: 90, source: "estimado" },
+  { id: "pty", name: "Ciudad de Panamá", state: "Panamá", coast: "escala", lat: 8.98, lon: -79.52, low: 50, high: 80, source: "estimado" },
+  { id: "boc", name: "Bocas del Toro", state: "Panamá", coast: "escala", lat: 9.34, lon: -82.25, low: 45, high: 75, source: "estimado" },
+  { id: "bqt", name: "Boquete", state: "Panamá", coast: "escala", lat: 8.78, lon: -82.43, low: 40, high: 65, source: "estimado" },
   { id: "sfo", name: "San Francisco", state: "California", coast: "oeste", lat: 37.77, lon: -122.42, low: 110, high: 160, source: "estimado" },
   { id: "lax", name: "Los Ángeles", state: "California", coast: "oeste", lat: 34.05, lon: -118.24, low: 95, high: 145, source: "estimado" },
   { id: "san", name: "San Diego", state: "California", coast: "oeste", lat: 32.72, lon: -117.16, low: 85, high: 130, source: "estimado" },
@@ -167,6 +178,35 @@ const KNOWN_HOPS: Record<string, Hop> = {
   "mia|ny": hop("vuelo", 3, 6.2, 80, 180, "estimado", "Vuelo NY ↔ Miami"),
   "ny|orl": hop("vuelo", 2.8, 6, 70, 170, "estimado", "Vuelo NY ↔ Orlando"),
   "atl|ny": hop("vuelo", 2.4, 5.5, 70, 180, "estimado", "Vuelo NY ↔ Atlanta"),
+  "fll|mia": hop("local", 0.6, 1.2, 8, 35, "estimado", "Auto / tren Miami ↔ Fort Lauderdale"),
+  "eyw|mia": hop("vuelo", 0.9, 3.2, 40, 110, "estimado", "Vuelo Miami ↔ Key West"),
+  "jax|mia": hop("vuelo", 1.3, 4, 40, 120, "estimado", "Vuelo Jacksonville ↔ Miami"),
+  "jax|orl": hop("tren", 2.2, 3, 20, 50, "estimado", "Auto / tren Jacksonville ↔ Orlando"),
+  "jax|ust": hop("local", 1, 1.4, 15, 40, "estimado", "Auto Jacksonville ↔ San Agustín"),
+  "aus|hou": hop("vuelo", 0.8, 3.2, 40, 110, "estimado", "Vuelo Austin ↔ Houston"),
+  "aus|sat": hop("local", 1.5, 2, 20, 50, "estimado", "Auto Austin ↔ San Antonio"),
+  "hou|sat": hop("vuelo", 0.8, 3, 35, 100, "estimado", "Vuelo Houston ↔ San Antonio"),
+  "hou|mia": hop("vuelo", 2.3, 5.5, 70, 170, "estimado", "Vuelo Houston ↔ Miami"),
+  "hou|msy": hop("vuelo", 1.2, 4, 50, 140, "estimado", "Vuelo Houston ↔ Nueva Orleans"),
+  "hou|ny": hop("vuelo", 3.6, 7, 90, 220, "estimado", "Vuelo NY ↔ Houston"),
+  "aus|ny": hop("vuelo", 3.8, 7.2, 90, 230, "estimado", "Vuelo NY ↔ Austin"),
+  "boc|pty": hop("vuelo", 1.1, 3.2, 40, 120, "estimado", "Vuelo Panamá ↔ Bocas"),
+  "bqt|pty": hop("vuelo", 1, 3, 40, 100, "estimado", "Vuelo Panamá ↔ David / Boquete"),
+  "boc|bqt": hop("vuelo", 1.2, 3.4, 50, 130, "estimado", "Vuelo Bocas ↔ David / Boquete"),
+  "mia|pty": hop("vuelo", 3.1, 6.2, 160, 280, "estimado", "Copa Panamá ↔ Miami"),
+  "fll|pty": hop("vuelo", 3.1, 6.2, 160, 280, "estimado", "Copa Panamá ↔ Fort Lauderdale"),
+  "orl|pty": hop("vuelo", 3.5, 6.6, 170, 290, "estimado", "Copa Panamá ↔ Orlando"),
+  "pty|tpa": hop("vuelo", 3.3, 6.4, 160, 280, "estimado", "Copa Panamá ↔ Tampa"),
+  "dc|pty": hop("vuelo", 4.8, 8, 180, 330, "estimado", "Copa Panamá ↔ D. C."),
+  "ny|pty": hop("vuelo", 5.2, 8.4, 200, 350, "estimado", "Copa Panamá ↔ NY"),
+  "nwk|pty": hop("vuelo", 5.2, 8.4, 200, 350, "estimado", "Copa Panamá ↔ Newark"),
+  "bos|pty": hop("vuelo", 5.5, 8.8, 210, 360, "estimado", "Copa Panamá ↔ Boston"),
+  "atl|pty": hop("vuelo", 3.8, 7, 170, 300, "estimado", "Copa Panamá ↔ Atlanta"),
+  "hou|pty": hop("vuelo", 4.3, 7.5, 170, 300, "estimado", "Copa Panamá ↔ Houston"),
+  "chi|pty": hop("vuelo", 5.2, 8.5, 200, 350, "estimado", "Copa Panamá ↔ Chicago"),
+  "lax|pty": hop("vuelo", 6.5, 10, 220, 400, "estimado", "Copa Panamá ↔ Los Ángeles"),
+  "pty|sfo": hop("vuelo", 7, 10.5, 230, 410, "estimado", "Copa Panamá ↔ San Francisco"),
+  "las|pty": hop("vuelo", 6.3, 9.8, 220, 400, "estimado", "Copa Panamá ↔ Las Vegas"),
   "chi|ny": hop("vuelo", 2.5, 5.5, 80, 200, "estimado", "Vuelo NY ↔ Chicago"),
   "lax|ny": hop("vuelo", 6, 10.5, 180, 380, "estimado", "Vuelo NY ↔ Los Ángeles"),
   "ny|sfo": hop("vuelo", 6.5, 11, 180, 380, "estimado", "Vuelo NY ↔ San Francisco"),
@@ -211,6 +251,21 @@ const PRESETS: Record<string, { label: string; stops: Stop[] }> = {
     stops: [
       { city: "dc", days: 3 },
       { city: "mia", days: 4 },
+      { city: "ny", days: 6 },
+    ],
+  },
+  texas: {
+    label: "Texas",
+    stops: [
+      { city: "aus", days: 3 },
+      { city: "hou", days: 2 },
+      { city: "ny", days: 6 },
+    ],
+  },
+  escala: {
+    label: "Panamá",
+    stops: [
+      { city: "pty", days: 3 },
       { city: "ny", days: 6 },
     ],
   },
@@ -298,11 +353,65 @@ function estimateHop(a: City, b: City): Hop {
   );
 }
 
-function hopBetween(fromId: string, toId: string): Hop {
+const COPA_US = new Set([
+  "ny",
+  "nwk",
+  "dc",
+  "mia",
+  "fll",
+  "orl",
+  "tpa",
+  "bos",
+  "atl",
+  "hou",
+  "chi",
+  "lax",
+  "sfo",
+  "las",
+]);
+
+function isEscala(id: string) {
+  return cityById(id)?.coast === "escala";
+}
+
+function hopIndexOf(fromId: string, toId: string, stops: Stop[]) {
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    if (stops[i]?.city === fromId && stops[i + 1]?.city === toId) return i;
+  }
+  return -1;
+}
+
+function firstUsIndex(stops: Stop[]) {
+  return stops.findIndex((stop) => !isEscala(stop.city));
+}
+
+function lastUsIndex(stops: Stop[]) {
+  for (let i = stops.length - 1; i >= 0; i -= 1) {
+    if (!isEscala(stops[i]?.city ?? "")) return i;
+  }
+  return -1;
+}
+
+function includedCopaLeg(fromId: string, toId: string, stops: Stop[]) {
+  const safe = ensureNy(stops);
+  const index = hopIndexOf(fromId, toId, safe);
+  if (index < 0) return false;
+  const firstUs = firstUsIndex(safe);
+  const lastUs = lastUsIndex(safe);
+  if (firstUs > 0 && index === firstUs - 1 && fromId === "pty" && COPA_US.has(toId)) return true;
+  if (lastUs >= 0 && index === lastUs && toId === "pty" && COPA_US.has(fromId)) return true;
+  return false;
+}
+
+function hopBetween(fromId: string, toId: string, stops?: Stop[]): Hop {
   const from = cityById(fromId);
   const to = cityById(toId);
   if (!from || !to) return hop("vuelo", 2.5, 5.5, 70, 180, "estimado", "Tramo interno");
-  return KNOWN_HOPS[hopKey(from.id, to.id)] ?? estimateHop(from, to);
+  const base = KNOWN_HOPS[hopKey(from.id, to.id)] ?? estimateHop(from, to);
+  if (stops && includedCopaLeg(fromId, toId, stops)) {
+    return hop(base.mode, base.hours, base.door, 0, 0, base.source, `${base.name} · incluido`);
+  }
+  return base;
 }
 
 function pad2(value: number) {
@@ -548,7 +657,10 @@ function slotAt(clientX: number, track: HTMLDivElement | null, stops: Stop[]): n
 function intlTo(cityId: string): Hop {
   const city = cityById(cityId);
   if (!city || city.id === "ny") return hop("vuelo", 15, 20, 0, 0, "notion", "Mendoza ↔ Nueva York");
+  if (city.id === "pty") return hop("vuelo", 7, 10, 0, 0, "estimado", "Mendoza ↔ Panamá (Copa)");
+  if (city.coast === "escala") return hop("vuelo", 8.5, 12, 0, 0, "estimado", "Mendoza ↔ Panamá + tramo interno");
   if (city.lon < -100) return hop("vuelo", 16.5, 22, 0, 0, "estimado", "Mendoza ↔ costa oeste");
+  if (city.lat < 32 && city.lon < -93) return hop("vuelo", 15.5, 21, 0, 0, "estimado", "Mendoza ↔ Texas");
   if (city.lat < 31) return hop("vuelo", 15.5, 21, 0, 0, "estimado", "Mendoza ↔ sur / Florida");
   if (city.lon < -85) return hop("vuelo", 15.5, 21, 0, 0, "estimado", "Mendoza ↔ centro");
   return hop("vuelo", 15, 20.5, 0, 0, "estimado", "Mendoza ↔ Este");
@@ -962,6 +1074,10 @@ function cityCode(id: string) {
   if (id === "dc") return "DC";
   if (id === "nwk") return "EWR";
   if (id === "buf") return "IAG";
+  if (id === "hou") return "IAH";
+  if (id === "pty") return "PTY";
+  if (id === "boc") return "BOC";
+  if (id === "bqt") return "DAV";
   return (cityById(id)?.id ?? id).toUpperCase();
 }
 
@@ -1189,7 +1305,7 @@ function trackSegs(stops: Stop[], start: string): TrackSeg[] {
         key: `${stop.city}-${next.city}-${index}`,
         from: stop.city,
         to: next.city,
-        hop: hopBetween(stop.city, next.city),
+        hop: hopBetween(stop.city, next.city, safe),
       });
     }
   });
@@ -1694,13 +1810,13 @@ export default function RoadmapApp() {
     return () => cancelAnimationFrame(frame);
   }, [grab?.kind, grab?.city, grab?.from]);
 
-  const active = ensureNy(
+  const rawStops =
     stops.length > 0
       ? stops
       : legacy.length > 0
         ? legacy.map((block) => ({ city: block.city, days: block.days }))
-        : PRESETS.A.stops,
-  );
+        : PRESETS.A.stops;
+  const active = ensureNy(rawStops.filter((stop) => cityById(stop.city)));
   const preview = draft ?? active;
   const rawStart = tripStart || startForEvent(active);
   const start = holdsEvent(active, rawStart) ? rawStart : clampStart(rawStart, active);
@@ -1720,13 +1836,16 @@ export default function RoadmapApp() {
   const outbound = lastCity ? intlTo(lastCity.id) : intlTo("ny");
   const routeHops = blocks.slice(0, -1).map((block, index) => {
     const next = blocks[index + 1] as Block;
-    return { from: block.city, to: next.city, hop: hopBetween(block.city, next.city) };
+    return { from: block.city, to: next.city, hop: hopBetween(block.city, next.city, preview) };
   });
   const hopLow = routeHops.reduce((sum, item) => sum + item.hop.costLow, 0);
   const hopHigh = routeHops.reduce((sum, item) => sum + item.hop.costHigh, 0);
   const hopHours = routeHops.reduce((sum, item) => sum + item.hop.hours, 0);
-  const openOut = firstCity && firstCity.id !== "ny";
-  const openIn = lastCity && lastCity.id !== "ny";
+  const usStops = preview.filter((stop) => !isEscala(stop.city));
+  const firstUs = usStops[0]?.city;
+  const lastUs = usStops[usStops.length - 1]?.city;
+  const openOut = Boolean(firstUs && firstUs !== "ny");
+  const openIn = Boolean(lastUs && lastUs !== "ny");
   const intlLow = FLIGHT + (openOut ? 120 : 0) + (openIn ? 120 : 0);
   const intlHigh = FLIGHT + (openOut ? 220 : 0) + (openIn ? 220 : 0);
   const ticketsLow = hopLow + intlLow;
@@ -1740,7 +1859,8 @@ export default function RoadmapApp() {
   const looking = query.trim().length > 0;
   const pool = CITIES.filter((city) => {
     if (looking) return cityMatches(city, query);
-    if (filter !== "ambas" && city.coast !== filter) return false;
+    const group = filter === "mexico" ? "escala" : filter;
+    if (group !== "ambas" && city.coast !== group) return false;
     return !active.some((stop) => stop.city === city.id);
   });
   const pillPages = Math.max(1, Math.ceil(pool.length / PILL_PAGE));
@@ -1952,6 +2072,18 @@ export default function RoadmapApp() {
             <span>
               <Pill
                 size="sm"
+                active={filter === "sur"}
+                onClick={() => {
+                  setFilter("sur");
+                  setPillPage(0);
+                }}
+              >
+                Sur
+              </Pill>
+            </span>
+            <span>
+              <Pill
+                size="sm"
                 active={filter === "oeste"}
                 onClick={() => {
                   setFilter("oeste");
@@ -1959,6 +2091,18 @@ export default function RoadmapApp() {
                 }}
               >
                 Oeste
+              </Pill>
+            </span>
+            <span>
+              <Pill
+                size="sm"
+                active={filter === "escala" || filter === "mexico"}
+                onClick={() => {
+                  setFilter("escala");
+                  setPillPage(0);
+                }}
+              >
+                Escala
               </Pill>
             </span>
           </Row>
@@ -1975,7 +2119,7 @@ export default function RoadmapApp() {
           >
             {visible.length === 0 ? (
               <Text size="small" tone="tertiary">
-                {looking ? "Ninguna ciudad coincide." : "No quedan sugerencias en esta costa."}
+                {looking ? "Ninguna ciudad coincide." : "No quedan sugerencias en este grupo."}
               </Text>
             ) : (
               visible.map((city, index) => {

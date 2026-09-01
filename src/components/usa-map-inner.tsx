@@ -15,6 +15,7 @@ import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import statesTopo from "us-atlas/states-10m.json";
+import panamaLand from "@/data/panama.json";
 import { theme } from "@/lib/theme";
 import "leaflet/dist/leaflet.css";
 
@@ -32,6 +33,21 @@ const US_BOUNDS: [[number, number], [number, number]] = [
   [24.5, -125],
   [49.4, -66.9],
 ];
+
+const CITY_FOCUS: Record<string, [[number, number], [number, number]]> = {
+  pty: [
+    [8.7, -80],
+    [9.3, -79.1],
+  ],
+  boc: [
+    [9.15, -82.45],
+    [9.5, -82.1],
+  ],
+  bqt: [
+    [8.65, -82.55],
+    [8.9, -82.3],
+  ],
+};
 
 const SKIP = new Set(["02", "15", "60", "66", "69", "72", "78"]);
 
@@ -57,8 +73,19 @@ const STATE_BY_CITY: Record<string, string> = {
   mia: "Florida",
   orl: "Florida",
   tpa: "Florida",
+  jax: "Florida",
+  fll: "Florida",
+  eyw: "Florida",
+  ust: "Florida",
   msy: "Louisiana",
   bna: "Tennessee",
+  mem: "Tennessee",
+  aus: "Texas",
+  hou: "Texas",
+  sat: "Texas",
+  pty: "Panama",
+  boc: "Panama",
+  bqt: "Panama",
   sfo: "California",
   lax: "California",
   san: "California",
@@ -76,9 +103,13 @@ const states = (() => {
     Geometry,
     { name: string }
   >;
+  const panama = panamaLand as FeatureCollection<Geometry, { name: string }>;
   return {
     ...raw,
-    features: raw.features.filter((item) => !SKIP.has(String(item.id))),
+    features: [
+      ...raw.features.filter((item) => !SKIP.has(String(item.id))),
+      ...panama.features,
+    ],
   };
 })();
 
@@ -91,13 +122,40 @@ function namesFor(ids: Iterable<string>) {
   return names;
 }
 
-function boundsFor(names: Set<string>) {
-  const features = states.features.filter((item) => names.has(item.properties.name));
-  if (features.length === 0) return L.latLngBounds(US_BOUNDS);
-  return L.geoJSON({
-    type: "FeatureCollection",
-    features,
-  } as FeatureCollection<Geometry, { name: string }>).getBounds().pad(0.12);
+function boundsFor(names: Set<string>, ids: string[] = [], focusId?: string | null) {
+  const focus = focusId ? CITY_FOCUS[focusId] : null;
+  if (focus) return L.latLngBounds(focus).pad(0.18);
+
+  const usFeatures = states.features.filter(
+    (item) => names.has(item.properties.name) && item.properties.name !== "Panama",
+  );
+  const overlayOnly = names.has("Panama") && usFeatures.length === 0;
+  if (overlayOnly) {
+    const overlay = states.features.filter((item) => item.properties.name === "Panama");
+    return L.geoJSON({
+      type: "FeatureCollection",
+      features: overlay,
+    } as FeatureCollection<Geometry, { name: string }>).getBounds().pad(0.2);
+  }
+
+  let bounds = usFeatures.length
+    ? L.geoJSON({
+        type: "FeatureCollection",
+        features: usFeatures,
+      } as FeatureCollection<Geometry, { name: string }>).getBounds()
+    : null;
+
+  if (names.has("Panama")) {
+    bounds = bounds ?? L.latLngBounds(US_BOUNDS);
+    for (const id of ids) {
+      const box = CITY_FOCUS[id];
+      if (!box) continue;
+      bounds.extend(box[0]);
+      bounds.extend(box[1]);
+    }
+  }
+
+  return (bounds ?? L.latLngBounds(US_BOUNDS)).pad(0.12);
 }
 
 const STATE_STYLE = {
@@ -218,8 +276,18 @@ const AIRPORT: Record<string, string> = {
   mia: "MIA",
   orl: "MCO",
   tpa: "TPA",
+  jax: "JAX",
+  fll: "FLL",
+  eyw: "EYW",
   atl: "ATL",
   msy: "MSY",
+  mem: "MEM",
+  aus: "AUS",
+  hou: "IAH",
+  sat: "SAT",
+  pty: "PTY",
+  boc: "BOC",
+  bqt: "DAV",
   sfo: "SFO",
   lax: "LAX",
   san: "SAN",
@@ -254,14 +322,16 @@ function Camera({
   const map = useMap();
 
   useEffect(() => {
+    const ids = tripKey.split(",").filter(Boolean);
     const focusState = focusId ? STATE_BY_CITY[focusId] ?? null : null;
     const names = focusState
       ? new Set([focusState])
-      : namesFor(tripKey.split(",").filter(Boolean));
+      : namesFor(ids);
+    const cityFocus = Boolean(focusId && CITY_FOCUS[focusId]);
     map.stop();
-    map.fitBounds(boundsFor(names), {
+    map.fitBounds(boundsFor(names, ids, focusId), {
       padding: [32, 32],
-      maxZoom: focusState ? 7 : 6,
+      maxZoom: cityFocus ? 8 : focusState ? 7 : 6,
       animate: true,
       duration: 0.4,
     });
@@ -301,7 +371,10 @@ export default function UsaMapInner({
     to: stopsOnMap[index + 1] as MapPlace,
   }));
 
-  const startBounds = boundsFor(tripStates);
+  const startBounds = boundsFor(
+    tripStates,
+    stops.map((stop) => stop.city),
+  );
 
   return (
     <div
