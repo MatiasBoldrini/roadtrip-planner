@@ -700,6 +700,32 @@ function formatRange(low: number, high: number) {
   return low === high ? usd(low) : `${usd(low)}–${usd(high)}`;
 }
 
+function stayCostLabel(city: City | undefined, days: number) {
+  if (!city) return "";
+  return city.source === "notion"
+    ? usd(city.low * days)
+    : formatRange(city.low * days, city.high * days);
+}
+
+function rideCostLabel(ride: RideHop, stops: Stop[]) {
+  if (ride.key === "in" || ride.key === "out") {
+    const usStops = ensureNy(stops).filter((stop) => !isEscala(stop.city));
+    const firstUs = usStops[0]?.city;
+    const lastUs = usStops[usStops.length - 1]?.city;
+    const openOut = Boolean(firstUs && firstUs !== "ny");
+    const openIn = Boolean(lastUs && lastUs !== "ny");
+    if (ride.key === "in") {
+      return formatRange(
+        FLIGHT + (openOut ? 120 : 0) + (openIn ? 120 : 0),
+        FLIGHT + (openOut ? 220 : 0) + (openIn ? 220 : 0),
+      );
+    }
+    return openIn ? formatRange(120, 220) : "incluido";
+  }
+  if (ride.hop.costLow === 0 && ride.hop.costHigh === 0) return "incluido";
+  return formatRange(ride.hop.costLow, ride.hop.costHigh);
+}
+
 const usd = (value: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -712,7 +738,7 @@ function Glyph({
   color,
   size = 16,
 }: {
-  kind: "plane" | "train" | "local" | "pin" | "home" | "plus" | "close" | "search";
+  kind: "plane" | "train" | "local" | "pin" | "home" | "plus" | "close" | "search" | "clock";
   color: string;
   size?: number;
 }) {
@@ -728,9 +754,26 @@ function Glyph({
   };
   if (kind === "plane") {
     return (
-      <svg {...common}>
-        <path d="M2 9.2h8.2L14 3.6 2 8V9.2z" />
-        <path d="M2 9.2 5.1 12.4M10.2 9.2 8.1 13.2" />
+      <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden>
+        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+      </svg>
+    );
+  }
+  if (kind === "clock") {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3.5 2" />
       </svg>
     );
   }
@@ -1148,6 +1191,16 @@ function CityFloat({ grab, lifted }: { grab: Grab; lifted: boolean }) {
           {Math.round(grab.days)}d
           {grab.event ? " · evento" : ""}
         </div>
+        <div
+          style={{
+            fontSize: theme.type.sm,
+            opacity: 0.7,
+            whiteSpace: "nowrap",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {stayCostLabel(city, grab.days)}
+        </div>
       </div>
     </div>
   );
@@ -1216,11 +1269,12 @@ function RideScale({ mark }: { mark: RideMark }) {
   );
 }
 
-function RideCard({ mark }: { mark: RideMark }) {
+function RideCard({ mark, stops }: { mark: RideMark; stops: Stop[] }) {
   const theme = useHostTheme();
   const from = cityCode(mark.ride.from);
   const to = cityCode(mark.ride.to);
   const hours = formatHours(mark.ride.hop.hours);
+  const cost = rideCostLabel(mark.ride, stops);
   return (
     <div
       title={mark.title}
@@ -1256,10 +1310,11 @@ function RideCard({ mark }: { mark: RideMark }) {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            gap: 8,
+            gap: 6,
           }}
         >
           <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{from}</span>
+          <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={14} />
           <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{to}</span>
         </div>
         <div
@@ -1271,7 +1326,7 @@ function RideCard({ mark }: { mark: RideMark }) {
             marginTop: 2,
           }}
         >
-          <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={12} />
+          <Glyph kind="clock" color={theme.text.secondary} size={16} />
           <span
             style={{
               fontSize: theme.type.sm,
@@ -1281,6 +1336,18 @@ function RideCard({ mark }: { mark: RideMark }) {
           >
             {hours}
           </span>
+        </div>
+        <div
+          style={{
+            fontSize: theme.type.sm,
+            fontVariantNumeric: "tabular-nums",
+            color: theme.text.secondary,
+            textAlign: "center",
+            marginTop: 2,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {cost}
         </div>
       </div>
     </div>
@@ -1486,7 +1553,7 @@ function RoadPills({
       <div
         style={{
           display: "flex",
-          minHeight: 52,
+          minHeight: 66,
           gap: 6,
         }}
       >
@@ -1625,6 +1692,18 @@ function RoadPills({
                         {dayLabel}
                         {event ? " · evento" : ""}
                       </div>
+                      <div
+                        style={{
+                          fontSize: theme.type.sm,
+                          opacity: 0.7,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {stayCostLabel(city, live)}
+                      </div>
                     </div>
                     <TrimHandle
                       edge="end"
@@ -1665,7 +1744,7 @@ function RoadPills({
       <div
         style={{
           position: "relative",
-          minHeight: 80,
+          minHeight: 96,
           marginTop: 2,
         }}
       >
@@ -1676,7 +1755,7 @@ function RoadPills({
         ))}
         {marks.map((mark) => (
           <div key={`card-${mark.ride.key}`}>
-            <RideCard mark={mark} />
+            <RideCard mark={mark} stops={stops} />
           </div>
         ))}
       </div>
@@ -1794,6 +1873,7 @@ export default function RoadmapApp() {
   const [legacy] = useCanvasState<Block[]>("blocks", []);
   const dragRef = useRef<Drag | null>(null);
   const trackHost = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [insert, setInsert] = useState<number | null>(null);
   const [draft, setDraft] = useState<Stop[] | null>(null);
   const [grab, setGrab] = useState<Grab | null>(null);
@@ -2003,26 +2083,30 @@ export default function RoadmapApp() {
           }}
         >
           <div
+            className="search-bar"
             style={{
-              position: "relative",
-              flex: "1 1 180px",
-              minWidth: 180,
-              maxWidth: 280,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flex: "1 1 420px",
+              minWidth: 260,
+              maxWidth: 560,
+              height: theme.control.height,
+              border: `1px solid ${theme.stroke.primary}`,
+              borderRadius: theme.control.radius,
+              background: theme.bg.elevated,
+              padding: "0 6px 0 10px",
+            }}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("button")) return;
+              searchRef.current?.focus();
             }}
           >
-            <span
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-                display: "flex",
-              }}
-            >
+            <span style={{ display: "flex", flexShrink: 0, pointerEvents: "none" }}>
               <Glyph kind="search" color={theme.text.tertiary} size={14} />
             </span>
             <input
+              ref={searchRef}
               type="search"
               value={query}
               placeholder="Buscar ciudad"
@@ -2044,21 +2128,32 @@ export default function RoadmapApp() {
                 setPillPage(0);
               }}
               style={{
-                width: "100%",
-                height: theme.control.height,
-                border: `1px solid ${theme.stroke.secondary}`,
-                borderRadius: theme.control.radius,
-                background: theme.bg.elevated,
+                flex: 1,
+                minWidth: 72,
+                height: "100%",
+                border: "none",
+                background: "transparent",
                 color: theme.text.primary,
-                padding: "0 12px 0 30px",
+                padding: 0,
                 font: "inherit",
                 fontSize: theme.type.sm,
                 outline: "none",
               }}
             />
-          </div>
-          <Row gap={6} style={{ flexShrink: 0 }}>
-            <span>
+            <div
+              aria-hidden
+              style={{
+                width: 1,
+                height: 16,
+                background: theme.stroke.secondary,
+                flexShrink: 0,
+              }}
+            />
+            <div
+              role="group"
+              aria-label="Filtrar por región"
+              style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+            >
               <Pill
                 size="sm"
                 active={filter === "este"}
@@ -2069,8 +2164,6 @@ export default function RoadmapApp() {
               >
                 Este
               </Pill>
-            </span>
-            <span>
               <Pill
                 size="sm"
                 active={filter === "sur"}
@@ -2081,8 +2174,6 @@ export default function RoadmapApp() {
               >
                 Sur
               </Pill>
-            </span>
-            <span>
               <Pill
                 size="sm"
                 active={filter === "oeste"}
@@ -2093,8 +2184,6 @@ export default function RoadmapApp() {
               >
                 Oeste
               </Pill>
-            </span>
-            <span>
               <Pill
                 size="sm"
                 active={filter === "escala" || filter === "mexico"}
@@ -2105,8 +2194,8 @@ export default function RoadmapApp() {
               >
                 Escala
               </Pill>
-            </span>
-          </Row>
+            </div>
+          </div>
           <div
             style={{
               display: "flex",

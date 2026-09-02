@@ -289,6 +289,7 @@ export function Pill({
   size = "md",
   onClick,
   title,
+  className,
 }: {
   children?: ReactNode;
   active?: boolean;
@@ -297,22 +298,28 @@ export function Pill({
   title?: string;
   disabled?: boolean;
   style?: CSSProperties;
+  className?: string;
 }) {
   const Tag = onClick ? "button" : "span";
+  const compact = size === "sm";
   return (
     <Tag
       type={onClick ? "button" : undefined}
       title={title}
       onClick={onClick}
-      className={active ? "ui-pill is-active" : "ui-pill"}
+      aria-pressed={onClick ? Boolean(active) : undefined}
+      className={[className, compact && "is-inline", active && "is-active", "ui-pill"]
+        .filter(Boolean)
+        .join(" ")}
       style={{
         display: "inline-flex",
         alignItems: "center",
         boxSizing: "border-box",
-        minHeight: theme.control.height,
+        minHeight: compact ? 22 : theme.control.height,
+        height: compact ? 22 : undefined,
         border: "none",
         borderRadius: theme.control.radius,
-        padding: `${theme.control.padY}px ${theme.control.padX}px`,
+        padding: compact ? "0 8px" : `${theme.control.padY}px ${theme.control.padX}px`,
         color: active ? theme.text.onAccent : theme.text.primary,
         font: "inherit",
         fontSize: theme.type.sm,
