@@ -166,7 +166,6 @@ const STATE_STYLE = {
 
 const MAP_RENDERER = L.canvas({
   padding: 0.5,
-  updateWhenZooming: false,
 });
 
 type LatLon = [number, number];
