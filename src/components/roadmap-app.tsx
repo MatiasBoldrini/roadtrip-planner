@@ -1720,12 +1720,12 @@ function AddCityChip({
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       title={used ? `Ya está · ${days} días` : `Sumar ${city.name}`}
+      className={`ui-chip${used ? " is-used" : ""}${grabbing ? " is-grabbing" : ""}`}
       style={{
         display: "flex",
         alignItems: "center",
         gap: 8,
         border: `1px solid ${theme.stroke.secondary}`,
-        background: used ? "transparent" : theme.fill.secondary,
         color: used ? theme.text.tertiary : theme.text.primary,
         height: theme.control.height,
         boxSizing: "border-box",
@@ -1734,7 +1734,8 @@ function AddCityChip({
         cursor: used ? "default" : grabbing ? "grabbing" : "grab",
         font: "inherit",
         opacity: grabbing ? 0.35 : 1,
-        transition: "opacity 160ms ease-out, transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
+        transition:
+          "background-color 140ms ease-out, opacity 160ms ease-out, transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
         transform: grabbing ? "scale(0.96)" : "scale(1)",
         whiteSpace: "nowrap",
       }}

@@ -27,6 +27,43 @@ input {
   font-family: inherit;
 }
 
+.ui-pill {
+  background: #f0f0f0;
+  transition: background-color 140ms ease-out;
+}
+
+.ui-pill:hover {
+  background: #e4e4e4;
+}
+
+.ui-pill.is-active {
+  background: #3d6b9e;
+}
+
+.ui-pill.is-active:hover {
+  background: #335a85;
+}
+
+.ui-chip {
+  background: #f0f0f0;
+}
+
+.ui-chip:hover:not(.is-used):not(.is-grabbing) {
+  background: #e4e4e4;
+}
+
+.ui-chip.is-used {
+  background: transparent;
+}
+
+.ui-chip.is-used:hover {
+  background: #f0f0f0;
+}
+
+.usa-map .leaflet-cities-pane {
+  z-index: 650;
+}
+
 .usa-map .usa-route-arrow,
 .usa-map .usa-city-mark {
   background: none !important;
@@ -44,6 +81,31 @@ input {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.usa-map .usa-city-mark.is-idle {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.usa-map .usa-city-mark.is-idle.is-hot {
+  opacity: 1;
+}
+
+.usa-map .usa-city-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #8a8a8a;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 16%);
+}
+
+.usa-map .usa-city-mark.is-idle.is-hot .usa-city-dot {
+  background: #d9843a;
+  width: 10px;
+  height: 10px;
 }
 
 .usa-map .usa-city-badge {

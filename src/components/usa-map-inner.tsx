@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import L from "leaflet";
 import {
-  CircleMarker,
   GeoJSON,
   MapContainer,
   Marker,
@@ -165,6 +164,11 @@ const STATE_STYLE = {
   fillOpacity: 0.9,
 };
 
+const MAP_RENDERER = L.canvas({
+  padding: 0.5,
+  updateWhenZooming: false,
+});
+
 type LatLon = [number, number];
 
 function distToSeg(point: LatLon, from: LatLon, to: LatLon) {
@@ -226,7 +230,6 @@ function HopLine({
   const [, setTick] = useState(0);
   useMapEvents({
     zoomend: () => setTick((n) => n + 1),
-    moveend: () => setTick((n) => n + 1),
   });
   const curve = hopArc([from.lat, from.lon], [to.lat, to.lon], avoid);
   const tipAt = Math.floor(curve.length * 0.66);
@@ -312,6 +315,31 @@ function cityIcon(order: number, name: string, hot: boolean, airport?: string) {
   });
 }
 
+const IDLE_DOT = L.divIcon({
+  className: "usa-city-mark is-idle",
+  html: `<span class="usa-city-dot"></span>`,
+  iconSize: [10, 10],
+  iconAnchor: [5, 5],
+});
+
+function idleIcon(name: string, hot: boolean) {
+  if (!hot) return IDLE_DOT;
+  const label = name.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return L.divIcon({
+    className: "usa-city-mark is-idle is-hot",
+    html: `<span class="usa-city-dot"></span><span class="usa-city-name">${label}</span>`,
+    iconSize: [160, 22],
+    iconAnchor: [5, 11],
+  });
+}
+
+function MapPanes() {
+  const map = useMap();
+  const pane = map.getPane("cities") ?? map.createPane("cities");
+  pane.style.zIndex = "650";
+  return null;
+}
+
 function Camera({
   tripKey,
   focusId,
@@ -333,7 +361,7 @@ function Camera({
       padding: [32, 32],
       maxZoom: cityFocus ? 8 : focusState ? 7 : 6,
       animate: true,
-      duration: 0.4,
+      duration: focusId ? 0.35 : 0.25,
     });
   }, [focusId, map, tripKey]);
 
@@ -391,12 +419,18 @@ export default function UsaMapInner({
         bounds={startBounds}
         scrollWheelZoom
         attributionControl={false}
+        preferCanvas
+        renderer={MAP_RENDERER}
+        zoomSnap={0}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={80}
         style={{ height: "100%", width: "100%", background: theme.bg.editor }}
         minZoom={3}
         maxZoom={8}
       >
-        <GeoJSON key={tripKey} data={states} style={STATE_STYLE} />
-        <Camera tripKey={tripKey} focusId={heldFocus} />
+        <MapPanes />
+        <GeoJSON data={states} style={STATE_STYLE} />
+        <Camera tripKey={tripKey} focusId={focusId} />
         {hops.map((hop, index) => (
           <HopLine
             key={`${index}-${hop.from.id}-${hop.to.id}`}
@@ -411,16 +445,13 @@ export default function UsaMapInner({
           if (chosen.has(city.id)) return null;
           const hot = heldFocus === city.id;
           return (
-            <CircleMarker
+            <Marker
               key={city.id}
-              center={[city.lat, city.lon]}
-              radius={hot ? 7 : 4}
-              pathOptions={{
-                color: theme.bg.elevated,
-                weight: 2,
-                fillColor: hot ? theme.category.orange : theme.text.tertiary,
-                fillOpacity: hot ? 1 : 0.55,
-              }}
+              pane="cities"
+              position={[city.lat, city.lon]}
+              icon={idleIcon(city.name, hot)}
+              zIndexOffset={hot ? 80 : 0}
+              interactive={false}
             />
           );
         })}
@@ -429,6 +460,7 @@ export default function UsaMapInner({
           return (
             <Marker
               key={`${city.id}-${index}`}
+              pane="cities"
               position={[city.lat, city.lon]}
               icon={cityIcon(
                 index + 1,
@@ -436,6 +468,7 @@ export default function UsaMapInner({
                 heldFocus === city.id,
                 gateway ? AIRPORT[city.id] : undefined,
               )}
+              zIndexOffset={200 + index * 10}
               interactive={false}
             />
           );

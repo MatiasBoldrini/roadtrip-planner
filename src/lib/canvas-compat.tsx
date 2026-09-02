@@ -304,6 +304,7 @@ export function Pill({
       type={onClick ? "button" : undefined}
       title={title}
       onClick={onClick}
+      className={active ? "ui-pill is-active" : "ui-pill"}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -312,7 +313,6 @@ export function Pill({
         border: "none",
         borderRadius: theme.control.radius,
         padding: `${theme.control.padY}px ${theme.control.padX}px`,
-        background: active ? theme.accent.primary : theme.fill.secondary,
         color: active ? theme.text.onAccent : theme.text.primary,
         font: "inherit",
         fontSize: theme.type.sm,
