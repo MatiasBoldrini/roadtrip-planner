@@ -57,6 +57,14 @@ input {
   background: #335a85;
 }
 
+.region-option:hover {
+  background: #f0f0f0;
+}
+
+.region-option.is-active:hover {
+  background: #335a85;
+}
+
 .ui-chip {
   background: #f0f0f0;
 }

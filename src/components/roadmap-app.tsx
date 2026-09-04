@@ -738,7 +738,7 @@ function Glyph({
   color,
   size = 16,
 }: {
-  kind: "plane" | "train" | "local" | "pin" | "home" | "plus" | "close" | "search" | "clock";
+  kind: "plane" | "train" | "local" | "pin" | "home" | "plus" | "close" | "search" | "clock" | "filter";
   color: string;
   size?: number;
 }) {
@@ -824,6 +824,13 @@ function Glyph({
       </svg>
     );
   }
+  if (kind === "filter") {
+    return (
+      <svg {...common}>
+        <path d="M2.4 3.4h11.2L9.4 8.6v3.6L6.6 13.8V8.6L2.4 3.4z" />
+      </svg>
+    );
+  }
   return (
     <svg {...common}>
       <path d="M8 14s5-4.2 5-7.2A5 5 0 0 0 3 6.8C3 9.8 8 14 8 14z" />
@@ -836,6 +843,132 @@ function hopKind(mode: Mode): "plane" | "train" | "local" {
   if (mode === "vuelo") return "plane";
   if (mode === "tren") return "train";
   return "local";
+}
+
+const REGION_OPTIONS: { id: Coast; label: string }[] = [
+  { id: "este", label: "Este" },
+  { id: "sur", label: "Sur" },
+  { id: "oeste", label: "Oeste" },
+  { id: "escala", label: "Escala" },
+];
+
+function regionId(filter: Filter): Coast {
+  if (filter === "mexico") return "escala";
+  if (filter === "ambas") return "este";
+  return filter;
+}
+
+function RegionFilter({
+  value,
+  onChange,
+}: {
+  value: Filter;
+  onChange: (next: Coast) => void;
+}) {
+  const theme = useHostTheme();
+  const root = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const selected = regionId(value);
+  const label = REGION_OPTIONS.find((option) => option.id === selected)?.label ?? "Este";
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={root} style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        type="button"
+        className="ui-pill is-active is-inline"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Filtrar por región"
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          boxSizing: "border-box",
+          minHeight: 22,
+          height: 22,
+          border: "none",
+          borderRadius: theme.control.radius,
+          padding: "0 8px 0 6px",
+          color: theme.text.onAccent,
+          font: "inherit",
+          fontSize: theme.type.sm,
+          cursor: "pointer",
+        }}
+      >
+        <Glyph kind="filter" color={theme.text.onAccent} size={12} />
+        {label}
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-label="Región"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            right: 0,
+            zIndex: 30,
+            minWidth: 120,
+            padding: 4,
+            background: theme.bg.elevated,
+            border: `1px solid ${theme.stroke.primary}`,
+            borderRadius: 12,
+            boxShadow: "0 8px 24px rgb(0 0 0 / 10%)",
+          }}
+        >
+          {REGION_OPTIONS.map((option) => {
+            const active = option.id === selected;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="option"
+                className={["region-option", active && "is-active"].filter(Boolean).join(" ")}
+                aria-selected={active}
+                onClick={() => {
+                  onChange(option.id);
+                  setOpen(false);
+                }}
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  alignItems: "center",
+                  height: 28,
+                  padding: "0 10px",
+                  border: "none",
+                  borderRadius: 8,
+                  background: active ? theme.accent.primary : "transparent",
+                  color: active ? theme.text.onAccent : theme.text.primary,
+                  font: "inherit",
+                  fontSize: theme.type.sm,
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 const MARK = 28;
@@ -1935,8 +2068,10 @@ export default function RoadmapApp() {
   const stayLow = blocks.reduce((sum, block) => sum + (cityById(block.city)?.low ?? 0) * block.days, 0);
   const stayHigh = blocks.reduce((sum, block) => sum + (cityById(block.city)?.high ?? 0) * block.days, 0);
   const extrasTotal = extras.reduce((sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : 0), 0);
-  const pocketLow = stayLow + ticketsLow + extrasTotal - CURSOR;
-  const pocketHigh = stayHigh + ticketsHigh + extrasTotal - CURSOR;
+  const tripLow = stayLow + ticketsLow + extrasTotal;
+  const tripHigh = stayHigh + ticketsHigh + extrasTotal;
+  const pocketLow = tripLow - CURSOR;
+  const pocketHigh = tripHigh - CURSOR;
   const looking = query.trim().length > 0;
   const pool = CITIES.filter((city) => {
     if (looking) return cityMatches(city, query);
@@ -2149,52 +2284,13 @@ export default function RoadmapApp() {
                 flexShrink: 0,
               }}
             />
-            <div
-              role="group"
-              aria-label="Filtrar por región"
-              style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}
-            >
-              <Pill
-                size="sm"
-                active={filter === "este"}
-                onClick={() => {
-                  setFilter("este");
-                  setPillPage(0);
-                }}
-              >
-                Este
-              </Pill>
-              <Pill
-                size="sm"
-                active={filter === "sur"}
-                onClick={() => {
-                  setFilter("sur");
-                  setPillPage(0);
-                }}
-              >
-                Sur
-              </Pill>
-              <Pill
-                size="sm"
-                active={filter === "oeste"}
-                onClick={() => {
-                  setFilter("oeste");
-                  setPillPage(0);
-                }}
-              >
-                Oeste
-              </Pill>
-              <Pill
-                size="sm"
-                active={filter === "escala" || filter === "mexico"}
-                onClick={() => {
-                  setFilter("escala");
-                  setPillPage(0);
-                }}
-              >
-                Escala
-              </Pill>
-            </div>
+            <RegionFilter
+              value={filter}
+              onChange={(next) => {
+                setFilter(next);
+                setPillPage(0);
+              }}
+            />
           </div>
           <div
             style={{
@@ -2278,9 +2374,16 @@ export default function RoadmapApp() {
       </div>
 
       <div ref={trackHost}>
-        <Row justify="space-between" align="end" style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto 1fr",
+            alignItems: "end",
+            marginBottom: 12,
+          }}
+        >
           <DateStep
-            label="Llegás"
+            label="Salís"
             value={start}
             canPrev={applyStart(active, start, addDays(start, -1)).start < start}
             canNext={applyStart(active, start, addDays(start, 1)).start > start}
@@ -2289,23 +2392,53 @@ export default function RoadmapApp() {
               persist(next.stops, next.start);
             }}
           />
-          <DateStep
-            label="Te vas"
-            value={last ? endOf(last) : EVENT}
-            canPrev={
-              !!last &&
-              tripEnd(applyEnd(active, start, addDays(endOf(last), -1)), start) < endOf(last)
-            }
-            canNext={
-              !!last &&
-              tripEnd(applyEnd(active, start, addDays(endOf(last), 1)), start) > endOf(last)
-            }
-            onStep={(dir) => {
-              if (!last) return;
-              persist(applyEnd(active, start, addDays(endOf(last), dir)));
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 4,
+              padding: "0 16px",
+              textAlign: "center",
             }}
-          />
-        </Row>
+          >
+            <Text size="small" tone="tertiary">
+              Estimado
+            </Text>
+            <Text
+              weight="semibold"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                minHeight: theme.control.height,
+                fontSize: theme.type.lg,
+                letterSpacing: "-0.03em",
+                lineHeight: 1.1,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatRange(tripLow, tripHigh)}
+            </Text>
+          </div>
+          <div style={{ justifySelf: "end" }}>
+            <DateStep
+              label="Llegás"
+              value={last ? endOf(last) : EVENT}
+              canPrev={
+                !!last &&
+                tripEnd(applyEnd(active, start, addDays(endOf(last), -1)), start) < endOf(last)
+              }
+              canNext={
+                !!last &&
+                tripEnd(applyEnd(active, start, addDays(endOf(last), 1)), start) > endOf(last)
+              }
+              onStep={(dir) => {
+                if (!last) return;
+                persist(applyEnd(active, start, addDays(endOf(last), dir)));
+              }}
+            />
+          </div>
+        </div>
         <RoadPills
           stops={preview}
           rulerStops={draft ? active : preview}
