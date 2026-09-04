@@ -183,13 +183,15 @@ export function Link({
   children,
   href,
   style,
+  title,
 }: {
   children?: ReactNode;
   href: string;
   style?: CSSProperties;
+  title?: string;
 }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" style={{ color: theme.text.link, ...style }}>
+    <a href={href} target="_blank" rel="noreferrer" title={title} style={{ color: theme.text.link, ...style }}>
       {children}
     </a>
   );

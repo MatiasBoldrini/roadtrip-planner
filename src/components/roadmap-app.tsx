@@ -298,6 +298,39 @@ function hopKey(a: string, b: string) {
   return [a, b].sort().join("|");
 }
 
+const FLIGHT_IATA: Record<string, string> = {
+  mdz: "MDZ",
+  ny: "NYC",
+  dc: "WAS",
+  nwk: "EWR",
+  buf: "BUF",
+  hou: "IAH",
+  pty: "PTY",
+  boc: "BOC",
+  bqt: "DAV",
+};
+
+function flightAirport(id: string) {
+  return FLIGHT_IATA[id] ?? (cityById(id)?.id ?? id).toUpperCase();
+}
+
+function googleFlightsUrl(fromId: string, toId: string, date?: string) {
+  const from = flightAirport(fromId);
+  const to = flightAirport(toId);
+  const q = date
+    ? `One way flights from ${from} to ${to} on ${date}`
+    : `One way flights from ${from} to ${to}`;
+  return `https://www.google.com/travel/flights?${new URLSearchParams({
+    hl: "es",
+    curr: "USD",
+    q,
+  })}`;
+}
+
+function flightHref(fromId: string, toId: string, mode: Mode, date?: string) {
+  return mode === "vuelo" ? googleFlightsUrl(fromId, toId, date) : undefined;
+}
+
 const NEC = new Set(["ny", "nwk", "phl", "wil", "bal", "dc", "bos", "pvd", "pwm", "ric"]);
 const CA_SOUTH = new Set(["lax", "san"]);
 
@@ -1023,10 +1056,12 @@ function BillLine({
   label,
   amount,
   kind = "item",
+  href,
 }: {
   label: string;
   amount: string;
   kind?: "section" | "item" | "foot";
+  href?: string;
 }) {
   const theme = useHostTheme();
   const item = kind === "item";
@@ -1047,7 +1082,13 @@ function BillLine({
         weight={item ? undefined : "semibold"}
         tone={item ? "tertiary" : "primary"}
       >
-        {label}
+        {href ? (
+          <Link href={href} title="Abrir en Google Flights">
+            {label}
+          </Link>
+        ) : (
+          label
+        )}
       </Text>
       <Text
         size={foot ? undefined : "small"}
@@ -1141,10 +1182,12 @@ function HopSep({
   title,
   subtitle,
   cost,
+  href,
 }: {
   title: string;
   subtitle: string;
   cost: string;
+  href?: string;
 }) {
   const theme = useHostTheme();
   return (
@@ -1179,7 +1222,13 @@ function HopSep({
           tone="secondary"
           style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
         >
-          {title}
+          {href ? (
+            <Link href={href} title="Abrir en Google Flights">
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
         </Text>
         <Text
           size="small"
@@ -1242,7 +1291,7 @@ function TrimHandle({
 
 type TrackSeg =
   | { kind: "stay"; index: number; stop: Stop; block: Block }
-  | { kind: "ride"; key: string; from: string; to: string; hop: Hop };
+  | { kind: "ride"; key: string; from: string; to: string; hop: Hop; date: string };
 
 function cityCode(id: string) {
   if (id === "mdz") return "MDZ";
@@ -1408,6 +1457,7 @@ function RideCard({ mark, stops }: { mark: RideMark; stops: Stop[] }) {
   const to = cityCode(mark.ride.to);
   const hours = formatHours(mark.ride.hop.hours);
   const cost = rideCostLabel(mark.ride, stops);
+  const href = flightHref(mark.ride.from, mark.ride.to, mark.ride.hop.mode, mark.ride.date);
   return (
     <div
       title={mark.title}
@@ -1446,9 +1496,30 @@ function RideCard({ mark, stops }: { mark: RideMark; stops: Stop[] }) {
             gap: 6,
           }}
         >
-          <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{from}</span>
-          <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={14} />
-          <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{to}</span>
+          {href ? (
+            <Link
+              href={href}
+              title="Abrir en Google Flights"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 6,
+                color: "inherit",
+                textDecoration: "none",
+              }}
+            >
+              <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{from}</span>
+              <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={14} />
+              <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{to}</span>
+            </Link>
+          ) : (
+            <>
+              <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{from}</span>
+              <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={14} />
+              <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{to}</span>
+            </>
+          )}
         </div>
         <div
           style={{
@@ -1493,7 +1564,14 @@ function trackSegs(stops: Stop[], start: string): TrackSeg[] {
   const segs: TrackSeg[] = [];
   const first = safe[0];
   if (first) {
-    segs.push({ kind: "ride", key: "in", from: "mdz", to: first.city, hop: intlTo(first.city) });
+    segs.push({
+      kind: "ride",
+      key: "in",
+      from: "mdz",
+      to: first.city,
+      hop: intlTo(first.city),
+      date: blocks[0]?.start ?? start,
+    });
   }
   safe.forEach((stop, index) => {
     const block = blocks[index];
@@ -1506,12 +1584,21 @@ function trackSegs(stops: Stop[], start: string): TrackSeg[] {
         from: stop.city,
         to: next.city,
         hop: hopBetween(stop.city, next.city, safe),
+        date: blocks[index + 1]?.start ?? start,
       });
     }
   });
   const last = safe[safe.length - 1];
   if (last) {
-    segs.push({ kind: "ride", key: "out", from: last.city, to: "mdz", hop: intlTo(last.city) });
+    const lastBlock = blocks[blocks.length - 1];
+    segs.push({
+      kind: "ride",
+      key: "out",
+      from: last.city,
+      to: "mdz",
+      hop: intlTo(last.city),
+      date: lastBlock ? endOf(lastBlock) : start,
+    });
   }
   return segs;
 }
@@ -2083,7 +2170,12 @@ export default function RoadmapApp() {
   const outbound = lastCity ? intlTo(lastCity.id) : intlTo("ny");
   const routeHops = blocks.slice(0, -1).map((block, index) => {
     const next = blocks[index + 1] as Block;
-    return { from: block.city, to: next.city, hop: hopBetween(block.city, next.city, preview) };
+    return {
+      from: block.city,
+      to: next.city,
+      hop: hopBetween(block.city, next.city, preview),
+      date: next.start,
+    };
   });
   const hopLow = routeHops.reduce((sum, item) => sum + item.hop.costLow, 0);
   const hopHigh = routeHops.reduce((sum, item) => sum + item.hop.costHigh, 0);
@@ -2476,6 +2568,7 @@ export default function RoadmapApp() {
               subtitle: string;
               cost: string;
               accent?: boolean;
+              href?: string;
             }> = [];
             if (firstCity && first) {
               rows.push({
@@ -2485,6 +2578,7 @@ export default function RoadmapApp() {
                 title: `MDZ → ${cityCode(firstCity.id)}`,
                 subtitle: `${formatDay(first.start)} · ${formatHours(inbound.hours)} · ${firstCity.name}`,
                 cost: formatRange(intlLow, intlHigh),
+                href: googleFlightsUrl("mdz", firstCity.id, first.start),
               });
             }
             blocks.forEach((block, index) => {
@@ -2499,6 +2593,7 @@ export default function RoadmapApp() {
                   title: `${cityCode(incoming.from)} → ${cityCode(incoming.to)}`,
                   subtitle: `${formatDay(block.start)} · ${formatHours(incoming.hop.hours)} · ${city.name}`,
                   cost: formatRange(incoming.hop.costLow, incoming.hop.costHigh),
+                  href: flightHref(incoming.from, incoming.to, incoming.hop.mode, incoming.date),
                 });
               }
               const stay =
@@ -2524,6 +2619,7 @@ export default function RoadmapApp() {
                 title: `${cityCode(lastCity.id)} → MDZ`,
                 subtitle: `${formatDay(endOf(last))} · ${formatHours(outbound.hours)} · Mendoza`,
                 cost: openIn ? formatRange(120, 220) : "incluido",
+                href: googleFlightsUrl(lastCity.id, "mdz", endOf(last)),
               });
             }
             return rows.map((row) =>
@@ -2533,6 +2629,7 @@ export default function RoadmapApp() {
                   title={row.title}
                   subtitle={row.subtitle}
                   cost={row.cost}
+                  href={row.href}
                 />
               ) : (
                 <GroupedCard key={row.key}>
@@ -2581,17 +2678,20 @@ export default function RoadmapApp() {
           <BillLine
             label={`MDZ → ${cityCode(firstCity?.id ?? "ny")}`}
             amount={formatRange(intlLow, intlHigh)}
+            href={googleFlightsUrl("mdz", firstCity?.id ?? "ny", first?.start)}
           />
           {routeHops.map((item) => (
             <BillLine
               key={`${item.from}-${item.to}`}
               label={`${cityCode(item.from)} → ${cityCode(item.to)}`}
               amount={formatRange(item.hop.costLow, item.hop.costHigh)}
+              href={flightHref(item.from, item.to, item.hop.mode, item.date)}
             />
           ))}
           <BillLine
             label={`${cityCode(lastCity?.id ?? "ny")} → MDZ`}
             amount={openIn ? formatRange(120, 220) : "incluido"}
+            href={googleFlightsUrl(lastCity?.id ?? "ny", "mdz", last ? endOf(last) : undefined)}
           />
           {extras.some((item) => item.name || item.amount) ? (
             <>
@@ -2698,19 +2798,41 @@ export default function RoadmapApp() {
             headers={["Tramo", "Horas", "Puerta", "Pasaje"]}
             rows={[
               [
-                `MDZ → ${cityCode(firstCity?.id ?? "ny")}`,
+                <Link
+                  key="in"
+                  href={googleFlightsUrl("mdz", firstCity?.id ?? "ny", first?.start)}
+                  title="Abrir en Google Flights"
+                >
+                  {`MDZ → ${cityCode(firstCity?.id ?? "ny")}`}
+                </Link>,
                 formatHours(inbound.hours),
                 formatHours(inbound.door),
                 openOut ? `${formatRange(120, 220)} extra` : "incluido",
               ],
-              ...routeHops.map((item) => [
-                `${cityCode(item.from)} → ${cityCode(item.to)}`,
-                formatHours(item.hop.hours),
-                formatHours(item.hop.door),
-                `${formatRange(item.hop.costLow, item.hop.costHigh)}${item.hop.source === "estimado" ? " · est." : ""}`,
-              ]),
+              ...routeHops.map((item) => {
+                const label = `${cityCode(item.from)} → ${cityCode(item.to)}`;
+                const href = flightHref(item.from, item.to, item.hop.mode, item.date);
+                return [
+                  href ? (
+                    <Link key={`${item.from}-${item.to}`} href={href} title="Abrir en Google Flights">
+                      {label}
+                    </Link>
+                  ) : (
+                    label
+                  ),
+                  formatHours(item.hop.hours),
+                  formatHours(item.hop.door),
+                  `${formatRange(item.hop.costLow, item.hop.costHigh)}${item.hop.source === "estimado" ? " · est." : ""}`,
+                ];
+              }),
               [
-                `${cityCode(lastCity?.id ?? "ny")} → MDZ`,
+                <Link
+                  key="out"
+                  href={googleFlightsUrl(lastCity?.id ?? "ny", "mdz", last ? endOf(last) : undefined)}
+                  title="Abrir en Google Flights"
+                >
+                  {`${cityCode(lastCity?.id ?? "ny")} → MDZ`}
+                </Link>,
                 formatHours(outbound.hours),
                 formatHours(outbound.door),
                 openIn ? `${formatRange(120, 220)} extra` : formatRange(intlLow, intlHigh),
