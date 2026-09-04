@@ -1,12 +1,13 @@
 "use client";
 
 import NumberFlow from "@number-flow/react";
-import { startTransition, ViewTransition, type ReactNode } from "react";
+import { type ReactNode, type Ref } from "react";
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
+  Divider,
   H1,
   H2,
   IconButton,
@@ -112,8 +113,6 @@ const CURSOR = 1200;
 const RANGE_START = "2026-10-20";
 const RANGE_END = "2026-11-22";
 const SHORT_MONTH = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const PILL_PAGE = 4;
-
 const CITIES: City[] = [
   { id: "ny", name: "Nueva York", state: "Nueva York", coast: "este", lat: 40.71, lon: -74.01, low: 98.6666666666667, high: 98.6666666666667, source: "notion" },
   { id: "dc", name: "Washington D. C.", state: "D. C.", coast: "este", lat: 38.91, lon: -77.04, low: 88.386, high: 88.386, source: "notion" },
@@ -881,17 +880,15 @@ function hopKind(mode: Mode): "plane" | "train" | "local" {
   return "local";
 }
 
-const REGION_OPTIONS: { id: Coast; label: string }[] = [
+const REGION_OPTIONS: { id: "este" | "sur" | "oeste"; label: string }[] = [
   { id: "este", label: "Este" },
   { id: "sur", label: "Sur" },
   { id: "oeste", label: "Oeste" },
-  { id: "escala", label: "Escala" },
 ];
 
-function regionId(filter: Filter): Coast {
-  if (filter === "mexico") return "escala";
-  if (filter === "ambas") return "este";
-  return filter;
+function regionId(filter: Filter): "este" | "sur" | "oeste" {
+  if (filter === "sur" || filter === "oeste") return filter;
+  return "este";
 }
 
 function RegionFilter({
@@ -899,7 +896,7 @@ function RegionFilter({
   onChange,
 }: {
   value: Filter;
-  onChange: (next: Coast) => void;
+  onChange: (next: "este" | "sur" | "oeste") => void;
 }) {
   const theme = useHostTheme();
   const root = useRef<HTMLDivElement>(null);
@@ -2048,95 +2045,154 @@ function RoadPills({
 }
 
 
-function AddCityChip({
-  city,
-  used,
-  days,
-  canRemove,
-  grabbing,
-  onFocus,
-  onBlur,
-  onDragStart,
+function CityPicker({
+  cities,
+  activeIds,
+  selectedId,
+  grabbingId,
+  listRef,
+  onSelect,
+  onAdd,
   onRemove,
+  onDragStart,
 }: {
-  city: City;
-  used: boolean;
-  days: number;
-  canRemove: boolean;
-  grabbing: boolean;
-  onFocus: () => void;
-  onBlur: () => void;
-  onDragStart: (event: Ptr) => void;
-  onRemove: () => void;
+  cities: City[];
+  activeIds: Set<string>;
+  selectedId: string | null;
+  grabbingId?: string | null;
+  listRef?: Ref<HTMLDivElement>;
+  onSelect: (id: string | null) => void;
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+  onDragStart: (city: City, event: Ptr) => void;
 }) {
   const theme = useHostTheme();
+
+  useEffect(() => {
+    if (!selectedId) return;
+    document.getElementById(`city-opt-${selectedId}`)?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
+
+  const move = (dir: number) => {
+    if (!cities.length) return;
+    const index = cities.findIndex((city) => city.id === selectedId);
+    const next =
+      index < 0
+        ? dir > 0
+          ? 0
+          : cities.length - 1
+        : Math.max(0, Math.min(cities.length - 1, index + dir));
+    onSelect(cities[next]?.id ?? null);
+  };
+
   return (
     <div
-      role="button"
+      ref={listRef}
+      className="city-picker"
+      role="listbox"
       tabIndex={0}
-      aria-label={used ? `${city.name}, ${days} días` : `Sumar ${city.name}`}
-      onPointerEnter={onFocus}
-      onPointerLeave={onBlur}
-      onPointerDown={(event: Ptr) => {
-        if (used) return;
-        onDragStart(event);
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      title={used ? `Ya está · ${days} días` : `Sumar ${city.name}`}
-      className={`ui-chip${used ? " is-used" : ""}${grabbing ? " is-grabbing" : ""}`}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        border: `1px solid ${theme.stroke.secondary}`,
-        color: used ? theme.text.tertiary : theme.text.primary,
-        height: theme.control.height,
-        boxSizing: "border-box",
-        borderRadius: theme.control.radius,
-        padding: `0 ${theme.control.padX}px`,
-        cursor: used ? "default" : grabbing ? "grabbing" : "grab",
-        font: "inherit",
-        opacity: grabbing ? 0.35 : 1,
-        transition:
-          "background-color 140ms ease-out, opacity 160ms ease-out, transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
-        transform: grabbing ? "scale(0.96)" : "scale(1)",
-        whiteSpace: "nowrap",
+      aria-label="Ciudades"
+      aria-activedescendant={selectedId ? `city-opt-${selectedId}` : undefined}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          move(1);
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          move(-1);
+        }
+        if (event.key === "Home" && cities[0]) {
+          event.preventDefault();
+          onSelect(cities[0].id);
+        }
+        if (event.key === "End" && cities.length) {
+          event.preventDefault();
+          onSelect(cities[cities.length - 1]?.id ?? null);
+        }
+        if (event.key === "Enter" && selectedId && !activeIds.has(selectedId)) {
+          event.preventDefault();
+          onAdd(selectedId);
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onSelect(null);
+        }
       }}
     >
-      <Glyph kind="pin" color={used ? theme.text.tertiary : theme.text.secondary} size={12} />
-      <span style={{ fontSize: theme.type.sm }}>{city.name}</span>
-      {used ? (
-        <span style={{ fontSize: theme.type.sm, color: theme.text.tertiary }}>{days}d</span>
+      {cities.length === 0 ? (
+        <Text size="small" tone="tertiary" style={{ display: "block", padding: "14px 12px" }}>
+          Ninguna ciudad coincide.
+        </Text>
       ) : (
-        <Glyph kind="plus" color={theme.text.secondary} size={12} />
+        cities.map((city, index) => {
+          const used = activeIds.has(city.id);
+          const active = selectedId === city.id;
+          const grabbing = grabbingId === city.id;
+          return (
+            <div
+              key={city.id}
+              id={`city-opt-${city.id}`}
+              role="option"
+              aria-selected={active}
+              aria-label={used ? `${city.name}, ya está en el viaje` : `Sumar ${city.name}`}
+              className={`city-picker-row${active ? " is-active" : ""}${used ? " is-used" : ""}`}
+              onPointerEnter={() => onSelect(city.id)}
+              onPointerDown={(event: Ptr) => {
+                if (used) return;
+                onDragStart(city, event);
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onClick={() => {
+                if (used) return;
+                onAdd(city.id);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                minHeight: 36,
+                padding: "0 12px",
+                borderBottom: index === cities.length - 1 ? "none" : `1px solid ${theme.stroke.tertiary}`,
+                color: used ? theme.text.tertiary : theme.text.primary,
+                cursor: used ? "default" : grabbing ? "grabbing" : "pointer",
+                opacity: grabbing ? 0.35 : 1,
+              }}
+            >
+              <Glyph kind="pin" color={active ? theme.accent.primary : theme.text.tertiary} size={12} />
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: theme.type.sm }}>
+                {city.name}
+              </span>
+              {used ? (
+                <span style={{ fontSize: 11, color: theme.text.tertiary }}>En viaje</span>
+              ) : (
+                <Glyph kind="plus" color={theme.text.tertiary} size={12} />
+              )}
+              {used && city.id !== "ny" ? (
+                <button
+                  type="button"
+                  title={`Sacar ${city.name}`}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemove(city.id);
+                  }}
+                  style={{
+                    display: "grid",
+                    placeItems: "center",
+                    padding: 0,
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Glyph kind="close" color={theme.text.tertiary} size={11} />
+                </button>
+              ) : null}
+            </div>
+          );
+        })
       )}
-      {canRemove ? (
-        <button
-          type="button"
-          title={`Sacar ${city.name}`}
-          onPointerDown={(event: { stopPropagation: () => void }) => {
-            event.stopPropagation();
-          }}
-          onClick={(event: { stopPropagation: () => void }) => {
-            event.stopPropagation();
-            onRemove();
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginLeft: 2,
-            padding: 0,
-            border: "none",
-            background: "transparent",
-            color: theme.text.tertiary,
-            cursor: "pointer",
-            font: "inherit",
-          }}
-        >
-          <Glyph kind="close" color={theme.text.tertiary} size={12} />
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -2155,16 +2211,19 @@ export default function RoadmapApp() {
     }
   }, [storedExtras]);
   const [legacy] = useCanvasState<Block[]>("blocks", []);
+  useEffect(() => {
+    if (filter === "escala" || filter === "mexico") setFilter("este");
+  }, [filter]);
   const [dock, setDock] = useCanvasState<ItineraryDock>("itineraryDock", "below");
   const dragRef = useRef<Drag | null>(null);
   const trackHost = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [insert, setInsert] = useState<number | null>(null);
   const [draft, setDraft] = useState<Stop[] | null>(null);
   const [grab, setGrab] = useState<Grab | null>(null);
   const [focusCity, setFocusCity] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [pillPage, setPillPage] = useState(0);
   const [lifted, setLifted] = useState(false);
 
   useEffect(() => {
@@ -2231,15 +2290,12 @@ export default function RoadmapApp() {
   const pocketHigh = tripHigh - CURSOR;
   const looking = query.trim().length > 0;
   const pool = CITIES.filter((city) => {
+    if (city.coast === "escala") return false;
     if (looking) return cityMatches(city, query);
-    const group = filter === "mexico" ? "escala" : filter;
-    if (group !== "ambas" && city.coast !== group) return false;
+    const group = regionId(filter);
+    if (city.coast !== group) return false;
     return !active.some((stop) => stop.city === city.id);
   });
-  const pillPages = Math.max(1, Math.ceil(pool.length / PILL_PAGE));
-  const safePage = Math.min(pillPage, pillPages - 1);
-  const visible = pool.slice(safePage * PILL_PAGE, safePage * PILL_PAGE + PILL_PAGE);
-
   const slotFromEvent = (clientX: number) => slotAt(clientX, trackHost.current, active);
 
   const endDrag = (clientX: number) => {
@@ -2363,6 +2419,8 @@ export default function RoadmapApp() {
         <H1>Roadmap</H1>
       </div>
 
+      <Divider />
+
       <div>
         <div
           style={{
@@ -2403,19 +2461,32 @@ export default function RoadmapApp() {
               aria-label="Buscar ciudad"
               onChange={(event) => {
                 setQuery(event.target.value);
-                setPillPage(0);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   setQuery("");
+                  setFocusCity(null);
+                  return;
+                }
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  const index = pool.findIndex((city) => city.id === focusCity);
+                  const next =
+                    event.key === "ArrowDown"
+                      ? pool[index < 0 ? 0 : Math.min(pool.length - 1, index + 1)]
+                      : pool[index < 0 ? pool.length - 1 : Math.max(0, index - 1)];
+                  if (next) setFocusCity(next.id);
+                  pickerRef.current?.focus();
                   return;
                 }
                 if (event.key !== "Enter") return;
-                const first = pool.find((city) => !active.some((stop) => stop.city === city.id));
-                if (!first) return;
-                persist(insertTaking(active, active.length, first.id));
+                const chosen =
+                  (focusCity && pool.find((city) => city.id === focusCity && !active.some((stop) => stop.city === city.id))) ||
+                  pool.find((city) => !active.some((stop) => stop.city === city.id));
+                if (!chosen) return;
+                persist(insertTaking(active, active.length, chosen.id));
                 setQuery("");
-                setPillPage(0);
+                setFocusCity(null);
               }}
               style={{
                 flex: 1,
@@ -2443,99 +2514,61 @@ export default function RoadmapApp() {
               value={filter}
               onChange={(next) => {
                 setFilter(next);
-                setPillPage(0);
+                setFocusCity(null);
               }}
             />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "nowrap",
-              alignItems: "center",
-              gap: 8,
-              flex: "1 1 240px",
-              justifyContent: "flex-end",
-              minWidth: 0,
-            }}
-          >
-            {visible.length === 0 ? (
-              <Text size="small" tone="tertiary">
-                {looking ? "Ninguna ciudad coincide." : "No quedan sugerencias en este grupo."}
-              </Text>
-            ) : (
-              visible.map((city, index) => {
-                const used = active.some((stop) => stop.city === city.id);
-                const days = active
-                  .filter((stop) => stop.city === city.id)
-                  .reduce((sum, stop) => sum + Math.max(1, Math.round(stop.days)), 0);
-                const lastNy =
-                  city.id === "ny" && active.filter((stop) => stop.city === "ny").length === 1;
-                return (
-                  <ViewTransition
-                    key={city.id}
-                    name={`pill-slot-${index}`}
-                    share="pill-morph"
-                    default="none"
-                  >
-                    <AddCityChip
-                      city={city}
-                      used={used}
-                      days={days}
-                      canRemove={used && !lastNy}
-                      grabbing={grab?.kind === "add" && grab.city === city.id}
-                      onFocus={() => setFocusCity(city.id)}
-                      onBlur={() => setFocusCity(null)}
-                      onDragStart={(event) => {
-                        dragRef.current = { kind: "add", city: city.id };
-                        const next = startGrab(event, event.currentTarget, {
-                          kind: "add",
-                          city: city.id,
-                          days: 3,
-                          event: false,
-                          from: null,
-                        });
-                        if (next) setGrab(next);
-                      }}
-                      onRemove={() => {
-                        let index = -1;
-                        for (let i = active.length - 1; i >= 0; i -= 1) {
-                          if (active[i]?.city === city.id) {
-                            index = i;
-                            break;
-                          }
-                        }
-                        if (index >= 0) persist(removeGiving(active, index));
-                      }}
-                    />
-                  </ViewTransition>
-                );
-              })
-            )}
-            {pool.length > PILL_PAGE ? (
-              <IconButton
-                title="Más ciudades"
-                size="sm"
-                onClick={() => {
-                  startTransition(() => {
-                    setPillPage((safePage + 1) % pillPages);
-                  });
-                }}
-              >
-                ›
-              </IconButton>
-            ) : null}
           </div>
         </div>
       </div>
 
+      <Divider />
+
       <div className={dock === "side" ? "itinerary-shell is-side" : "itinerary-shell"}>
       <div className="itinerary-main">
+      <div className="map-with-picker">
       <UsaMap
         stops={active}
         cities={CITIES}
         focusId={focusCity}
         onAddCity={(id) => persist(insertTaking(active, active.length, id))}
+        onFocusCity={setFocusCity}
       />
+      <CityPicker
+        cities={pool}
+        activeIds={new Set(active.map((stop) => stop.city))}
+        selectedId={focusCity}
+        grabbingId={grab?.kind === "add" ? grab.city : null}
+        listRef={pickerRef}
+        onSelect={setFocusCity}
+        onAdd={(id) => {
+          persist(insertTaking(active, active.length, id));
+          setQuery("");
+        }}
+        onRemove={(id) => {
+          let index = -1;
+          for (let i = active.length - 1; i >= 0; i -= 1) {
+            if (active[i]?.city === id) {
+              index = i;
+              break;
+            }
+          }
+          if (index >= 0) persist(removeGiving(active, index));
+        }}
+        onDragStart={(city, event) => {
+          dragRef.current = { kind: "add", city: city.id };
+          const next = startGrab(event, event.currentTarget, {
+            kind: "add",
+            city: city.id,
+            days: 3,
+            event: false,
+            from: null,
+          });
+          if (next) setGrab(next);
+        }}
+      />
+      </div>
+
+      <Divider />
 
       <div ref={trackHost}>
         <div
@@ -2691,6 +2724,8 @@ export default function RoadmapApp() {
       </div>
       </div>
 
+      <Divider />
+
       <div>
         <H2>Cuentas</H2>
         <div style={{ maxWidth: 420, marginTop: 8 }}>
@@ -2759,6 +2794,8 @@ export default function RoadmapApp() {
           />
         </div>
       </div>
+
+      <Divider />
 
       <div>
         <H2>Gastos extra</H2>

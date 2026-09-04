@@ -18,6 +18,7 @@ import panamaLand from "@/data/panama.json";
 import {
   PlacePeek,
   type PlacePick,
+  prefetchPlaceMedia,
   stateLabel,
   wikiTitleForCity,
   wikiTitleForState,
@@ -165,18 +166,18 @@ function boundsFor(names: Set<string>, ids: string[] = [], focusId?: string | nu
 }
 
 const STATE_STYLE = {
-  color: theme.fill.secondary,
+  color: theme.stroke.primary,
   weight: 1,
   fillColor: theme.fill.secondary,
-  fillOpacity: 0.9,
+  fillOpacity: 1,
 };
 
 const STATE_BORDER = {
   stroke: true,
   fill: false,
-  color: theme.text.quaternary,
+  color: theme.stroke.primary,
   weight: 1,
-  opacity: 0.65,
+  opacity: 1,
   lineJoin: "round" as const,
 };
 
@@ -631,6 +632,8 @@ function MapPanes() {
   const map = useMap();
   const cities = map.getPane("cities") ?? map.createPane("cities");
   cities.style.zIndex = "650";
+  const borders = map.getPane("state-borders") ?? map.createPane("state-borders");
+  borders.style.zIndex = "425";
   const labels = map.getPane("state-labels") ?? map.createPane("state-labels");
   labels.style.zIndex = "430";
   return null;
@@ -669,16 +672,38 @@ function firstCityInState(state: string, cities: MapPlace[], chosen: Set<string>
   return matches.find((city) => !chosen.has(city.id)) ?? matches[0];
 }
 
+function FocusFromList({
+  focusId,
+  cities,
+  onShow,
+}: {
+  focusId?: string | null;
+  cities: MapPlace[];
+  onShow: (city: MapPlace, point: MapPoint) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (!focusId) return;
+    const city = cities.find((item) => item.id === focusId);
+    if (!city) return;
+    const point = map.latLngToContainerPoint(L.latLng(city.lat, city.lon));
+    onShow(city, { x: point.x, y: point.y });
+  }, [cities, focusId, map, onShow]);
+  return null;
+}
+
 export default function UsaMapInner({
   stops,
   cities,
   focusId,
   onAddCity,
+  onFocusCity,
 }: {
   stops: MapStop[];
   cities: MapPlace[];
   focusId?: string | null;
   onAddCity?: (id: string) => void;
+  onFocusCity?: (id: string | null) => void;
 }) {
   const tripKey = stops.map((stop) => stop.city).join(",");
   const tripStates = useMemo(() => namesFor(stops.map((stop) => stop.city)), [tripKey]);
@@ -699,6 +724,12 @@ export default function UsaMapInner({
     from,
     to: stopsOnMap[index + 1] as MapPlace,
   }));
+
+  useEffect(() => {
+    for (const city of stopsOnMap) {
+      prefetchPlaceMedia(wikiTitleForCity(city.id, STATE_BY_CITY[city.id] ?? city.state));
+    }
+  }, [tripKey]);
 
   const startBounds = boundsFor(
     tripStates,
@@ -723,6 +754,7 @@ export default function UsaMapInner({
 
   const hoverPlace = useCallback(
     (place: PlacePick, point: MapPoint) => {
+      prefetchPlaceMedia(place.wiki);
       if (hideTimer.current) {
         window.clearTimeout(hideTimer.current);
         hideTimer.current = null;
@@ -749,9 +781,12 @@ export default function UsaMapInner({
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => {
       hideTimer.current = null;
-      setHovered(null);
+      setHovered((prev) => {
+        if (focusId && prev?.cityId === focusId) return prev;
+        return null;
+      });
     }, 180);
-  }, []);
+  }, [focusId]);
 
   const hoverState = useCallback(
     (name: string, point: MapPoint) => {
@@ -773,6 +808,7 @@ export default function UsaMapInner({
   const hoverCity = useCallback(
     (city: MapPlace, point: MapPoint) => {
       const state = STATE_BY_CITY[city.id] ?? city.state;
+      onFocusCity?.(city.id);
       hoverPlace(
         {
           state,
@@ -784,7 +820,7 @@ export default function UsaMapInner({
         point,
       );
     },
-    [hoverPlace],
+    [hoverPlace, onFocusCity],
   );
 
   useLayoutEffect(() => {
@@ -804,7 +840,7 @@ export default function UsaMapInner({
         height: 420,
         width: "100%",
         overflow: "hidden",
-        border: "none",
+        border: `1px solid ${theme.stroke.secondary}`,
         borderRadius: 12,
       }}
     >
@@ -825,9 +861,10 @@ export default function UsaMapInner({
           onHover={hoverState}
           onLeave={leavePlace}
         />
-        <GeoJSON data={states} interactive={false} style={STATE_BORDER} />
+        <GeoJSON data={states} pane="state-borders" interactive={false} style={STATE_BORDER} />
         <StateNames picked={hovered?.state ?? null} allow={labeledStates} />
         <Camera tripKey={tripKey} focusId={focusId} />
+        <FocusFromList focusId={focusId} cities={cities} onShow={hoverCity} />
         {hops.map((hop, index) => (
           <HopLine
             key={`${index}-${hop.from.id}-${hop.to.id}`}

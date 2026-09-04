@@ -271,10 +271,17 @@ input {
 
 .place-peek-photo {
   object-fit: cover;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.place-peek-photo.is-ready {
+  opacity: 1;
 }
 
 .place-peek-copy {
   padding: 10px 12px 12px;
+  border-top: 1px solid #e5e5e5;
 }
 
 .place-peek-kicker {
@@ -384,6 +391,51 @@ input {
   100% {
     filter: blur(0);
     opacity: 1;
+  }
+}
+
+.map-with-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  overflow: hidden;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+}
+
+.map-with-picker .usa-map {
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.city-picker {
+  height: 420px;
+  overflow: auto;
+  border-left: 1px solid #e5e5e5;
+  background: #fff;
+  outline: none;
+}
+
+.city-picker:focus-visible {
+  box-shadow: inset 0 0 0 2px #3d6b9e;
+}
+
+.city-picker-row.is-active {
+  background: #f0f0f0;
+}
+
+.city-picker-row.is-active.is-used {
+  background: #f4f4f4;
+}
+
+@media (max-width: 800px) {
+  .map-with-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .city-picker {
+    height: 220px;
+    border-top: 1px solid #e5e5e5;
+    border-left: none;
   }
 }
 

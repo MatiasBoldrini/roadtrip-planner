@@ -116,11 +116,64 @@ const CITY_WIKI: Record<string, string> = {
 };
 
 const FALLBACK_PHOTOS = [
-  "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fm=webp&fit=crop&w=500&q=70",
 ];
+
+const WIKI_STEPS = [20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840];
+const HERO_WIDTH = 500;
+
+function wikiStep(width: number) {
+  return WIKI_STEPS.find((step) => step >= width) ?? WIKI_STEPS[WIKI_STEPS.length - 1];
+}
+
+export function webpPhoto(src: string, width = HERO_WIDTH) {
+  try {
+    const url = new URL(src);
+    if (url.hostname === "images.unsplash.com") {
+      url.searchParams.set("auto", "format");
+      url.searchParams.set("fm", "webp");
+      url.searchParams.set("w", String(width));
+      url.searchParams.set("q", "70");
+      url.searchParams.set("fit", "crop");
+      return url.toString();
+    }
+    if (!url.hostname.endsWith("wikimedia.org")) return src;
+    url.search = "";
+    const step = wikiStep(width);
+    const thumb = url.pathname.match(/^(.*\/thumb\/.+\/)\d+px-(.+?)(?:\.webp)?$/);
+    if (thumb) {
+      url.pathname = `${thumb[1]}${step}px-${thumb[2].replace(/\.webp$/i, "")}.webp`;
+      return url.toString();
+    }
+    const original = url.pathname.match(/^(\/wikipedia\/[^/]+\/)([0-9a-f]\/[0-9a-f]{2}\/.+)$/i);
+    if (original) {
+      const file = original[2].split("/").pop() ?? "";
+      url.pathname = `${original[1]}thumb/${original[2]}/${step}px-${file}.webp`;
+      return url.toString();
+    }
+    return src;
+  } catch {
+    return src;
+  }
+}
+
+function preloadWebp(src: string) {
+  if (typeof document === "undefined") return;
+  const href = webpPhoto(src);
+  if (document.querySelector(`link[data-peek-img="${CSS.escape(href)}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.as = "image";
+  link.type = "image/webp";
+  link.href = href;
+  link.setAttribute("data-peek-img", href);
+  document.head.appendChild(link);
+  const img = new window.Image();
+  img.src = href;
+}
 
 export function stateLabel(name: string) {
   return STATE_ES[name] ?? name;
@@ -165,8 +218,9 @@ function absUrl(src?: string) {
 function srcsetUrl(srcset?: { src?: string } | Array<{ src?: string }>) {
   if (!srcset) return null;
   if (Array.isArray(srcset)) {
-    const best = [...srcset].reverse().find((item) => item.src) ?? srcset[0];
-    return absUrl(best?.src);
+    const preferred =
+      srcset.find((item) => /\/(330|500)px-/.test(item.src ?? "")) ?? srcset[0];
+    return absUrl(preferred?.src);
   }
   return absUrl(srcset.src);
 }
@@ -203,6 +257,23 @@ function pickScenicPhotos(items: WikiMediaItem[]) {
 }
 
 const mediaCache = new Map<string, { photos: string[]; blurb: string }>();
+const prefetching = new Map<string, Promise<{ photos: string[]; blurb: string }>>();
+
+export function prefetchPlaceMedia(wiki: string) {
+  const cached = mediaCache.get(wiki);
+  if (cached?.photos[0]) {
+    preloadWebp(cached.photos[0]);
+    return;
+  }
+  if (prefetching.has(wiki)) return;
+  const pending = loadPlaceMedia(wiki, new AbortController().signal)
+    .then((next) => {
+      if (next.photos[0]) preloadWebp(next.photos[0]);
+      return next;
+    })
+    .catch(() => ({ photos: FALLBACK_PHOTOS, blurb: "" }));
+  prefetching.set(wiki, pending);
+}
 
 async function wikiJson<T>(path: string, signal: AbortSignal): Promise<T | null> {
   const res = await fetch(`https://en.wikipedia.org/api/rest_v1/${path}`, {
@@ -242,6 +313,7 @@ async function loadPlaceMedia(wiki: string, signal: AbortSignal) {
     blurb,
   };
   mediaCache.set(wiki, next);
+  if (next.photos[0]) preloadWebp(next.photos[0]);
   return next;
 }
 
@@ -270,11 +342,14 @@ export function PlacePeek({
   onLeave?: () => void;
 }) {
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoOn, setPhotoOn] = useState(false);
 
   useEffect(() => {
     const ac = new AbortController();
     const cached = mediaCache.get(place.wiki);
     setPhotos(cached?.photos ?? []);
+    setPhotoOn(false);
+    if (cached?.photos[0]) preloadWebp(cached.photos[0]);
     if (cached) return () => ac.abort();
     loadPlaceMedia(place.wiki, ac.signal)
       .then((next) => {
@@ -285,7 +360,7 @@ export function PlacePeek({
     return () => ac.abort();
   }, [place.wiki]);
 
-  const hero = photos[0];
+  const hero = photos[0] ? webpPhoto(photos[0]) : "";
 
   return (
     <aside
@@ -298,13 +373,16 @@ export function PlacePeek({
       <div className="place-peek-hero">
         {hero ? (
           <Image
+            key={hero}
             src={hero}
             alt=""
             fill
-            sizes="280px"
-            className="place-peek-photo"
+            sizes="268px"
+            className={`place-peek-photo${photoOn ? " is-ready" : ""}`}
             referrerPolicy="no-referrer"
             priority
+            unoptimized
+            onLoad={() => setPhotoOn(true)}
           />
         ) : null}
       </div>
