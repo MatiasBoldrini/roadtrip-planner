@@ -57,8 +57,19 @@ input {
   background: #335a85;
 }
 
+.region-option {
+  background: transparent;
+  color: #171717;
+  transition: background-color 140ms ease-out;
+}
+
 .region-option:hover {
   background: #f0f0f0;
+}
+
+.region-option.is-active {
+  background: #3d6b9e;
+  color: #fff;
 }
 
 .region-option.is-active:hover {

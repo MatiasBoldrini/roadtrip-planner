@@ -872,7 +872,6 @@ function RegionFilter({
   const root = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const selected = regionId(value);
-  const label = REGION_OPTIONS.find((option) => option.id === selected)?.label ?? "Este";
 
   useEffect(() => {
     if (!open) return;
@@ -897,7 +896,7 @@ function RegionFilter({
         className="ui-pill is-active is-inline"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Filtrar por región"
+        aria-label="Filtrar por costa"
         onClick={() => setOpen((prev) => !prev)}
         style={{
           display: "inline-flex",
@@ -916,7 +915,7 @@ function RegionFilter({
         }}
       >
         <Glyph kind="filter" color={theme.text.onAccent} size={12} />
-        {label}
+        Costa
       </button>
       {open ? (
         <div
@@ -956,8 +955,6 @@ function RegionFilter({
                   padding: "0 10px",
                   border: "none",
                   borderRadius: 8,
-                  background: active ? theme.accent.primary : "transparent",
-                  color: active ? theme.text.onAccent : theme.text.primary,
                   font: "inherit",
                   fontSize: theme.type.sm,
                   textAlign: "left",
