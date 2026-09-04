@@ -374,7 +374,6 @@ function Camera({
   focusId?: string | null;
 }) {
   const map = useMap();
-  const tripRef = useRef(tripKey);
 
   useEffect(() => {
     const ids = tripKey.split(",").filter(Boolean);
@@ -383,14 +382,12 @@ function Camera({
       ? new Set([focusState])
       : namesFor(ids);
     const cityFocus = Boolean(focusId && CITY_FOCUS[focusId]);
-    const tripChanged = tripRef.current !== tripKey;
-    tripRef.current = tripKey;
     map.stop();
     map.fitBounds(boundsFor(names, ids, focusId), {
-      padding: [32, 32],
-      maxZoom: cityFocus ? 8 : focusState ? 7 : 6,
-      animate: tripChanged && !focusId,
-      duration: 0.25,
+      padding: focusId ? [56, 56] : [32, 32],
+      maxZoom: cityFocus ? 5 : focusId ? 4 : 6,
+      animate: true,
+      duration: focusId ? 0.4 : 0.3,
     });
   }, [focusId, map, tripKey]);
 
