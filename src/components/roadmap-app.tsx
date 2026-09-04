@@ -1509,9 +1509,9 @@ function RideCard({ mark, stops }: { mark: RideMark; stops: Stop[] }) {
                 textDecoration: "none",
               }}
             >
-              <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{from}</span>
+              <span style={{ fontSize: theme.type.sm, fontWeight: 600, textDecoration: "underline" }}>{from}</span>
               <Glyph kind={hopKind(mark.ride.hop.mode)} color={theme.text.secondary} size={14} />
-              <span style={{ fontSize: theme.type.sm, fontWeight: 600 }}>{to}</span>
+              <span style={{ fontSize: theme.type.sm, fontWeight: 600, textDecoration: "underline" }}>{to}</span>
             </Link>
           ) : (
             <>

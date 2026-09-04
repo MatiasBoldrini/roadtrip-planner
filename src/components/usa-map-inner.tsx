@@ -268,6 +268,129 @@ function DismissOnMap({
 
 type LatLon = [number, number];
 
+const LABEL_CENTER: Record<string, LatLon> = {
+  Florida: [28.3, -81.7],
+  Michigan: [44.35, -85.4],
+  Louisiana: [31.05, -92.5],
+  "New York": [42.95, -75.8],
+  California: [37.2, -119.7],
+  Idaho: [44.3, -114.5],
+  Virginia: [37.5, -78.6],
+  Maryland: [39.05, -76.7],
+  Massachusetts: [42.3, -72.05],
+  "New Jersey": [40.15, -74.72],
+  Washington: [47.4, -120.3],
+  Nevada: [39.6, -116.8],
+  Texas: [31.5, -99.4],
+  "West Virginia": [38.6, -80.6],
+};
+
+function ringCentroid(ring: number[][]): LatLon {
+  let lat = 0;
+  let lon = 0;
+  const count = ring.length || 1;
+  for (const point of ring) {
+    lon += point[0] ?? 0;
+    lat += point[1] ?? 0;
+  }
+  return [lat / count, lon / count];
+}
+
+function featureCentroid(geometry: Geometry): LatLon {
+  let best: number[][] | null = null;
+  const consider = (rings: number[][][]) => {
+    const ring = rings[0];
+    if (!ring || ring.length <= (best?.length ?? 0)) return;
+    best = ring;
+  };
+  if (geometry.type === "Polygon") consider(geometry.coordinates);
+  if (geometry.type === "MultiPolygon") {
+    for (const polygon of geometry.coordinates) consider(polygon);
+  }
+  return best ? ringCentroid(best) : [39, -98];
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+}
+
+function stateNameIcon(label: string) {
+  return L.divIcon({
+    className: "usa-state-name",
+    html: `<span>${escapeHtml(label)}</span>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+const STATE_LABELS = states.features.map((item) => {
+  const name = item.properties.name;
+  const bounds = L.geoJSON(item).getBounds();
+  const km = bounds.getNorthEast().distanceTo(bounds.getSouthWest()) / 1000;
+  return {
+    name,
+    center: LABEL_CENTER[name] ?? featureCentroid(item.geometry),
+    icon: stateNameIcon(stateLabel(name)),
+    minZoom: km < 250 ? 6 : km < 450 ? 5 : km < 800 ? 4 : 3,
+  };
+});
+
+function StateNameMark({
+  item,
+  active,
+}: {
+  item: (typeof STATE_LABELS)[number];
+  active: boolean;
+}) {
+  const ref = useRef<L.Marker | null>(null);
+  const apply = () => {
+    const el = ref.current?.getElement();
+    if (!el) return;
+    el.classList.toggle("is-active", active);
+    el.dataset.minZoom = String(item.minZoom);
+  };
+  useLayoutEffect(apply, [active, item.minZoom]);
+  return (
+    <Marker
+      ref={ref}
+      pane="state-labels"
+      position={item.center}
+      icon={item.icon}
+      interactive={false}
+      keyboard={false}
+      zIndexOffset={active ? 20 : 0}
+      eventHandlers={{ add: apply }}
+    />
+  );
+}
+
+function StateNames({ picked }: { picked: string | null }) {
+  return (
+    <>
+      {STATE_LABELS.map((item) => (
+        <StateNameMark key={item.name} item={item} active={picked === item.name} />
+      ))}
+    </>
+  );
+}
+
+function MapChrome() {
+  const map = useMap();
+  const syncZoom = () => {
+    const root = map.getContainer().closest(".usa-map");
+    if (root instanceof HTMLElement) root.dataset.zoom = String(Math.floor(map.getZoom()));
+  };
+  useEffect(() => {
+    map.scrollWheelZoom.disable();
+    syncZoom();
+  }, [map]);
+  useMapEvents({
+    zoom: syncZoom,
+    zoomend: syncZoom,
+  });
+  return null;
+}
+
 function distToSeg(point: LatLon, from: LatLon, to: LatLon) {
   const vx = to[0] - from[0];
   const vy = to[1] - from[1];
@@ -471,8 +594,10 @@ function HotMarker({
 
 function MapPanes() {
   const map = useMap();
-  const pane = map.getPane("cities") ?? map.createPane("cities");
-  pane.style.zIndex = "650";
+  const cities = map.getPane("cities") ?? map.createPane("cities");
+  cities.style.zIndex = "650";
+  const labels = map.getPane("state-labels") ?? map.createPane("state-labels");
+  labels.style.zIndex = "430";
   return null;
 }
 
@@ -577,17 +702,18 @@ export default function UsaMapInner({
     >
       <MapContainer
         bounds={startBounds}
-        scrollWheelZoom
+        scrollWheelZoom={false}
         attributionControl={false}
-        zoomSnap={0}
+        zoomSnap={0.5}
         zoomDelta={0.5}
-        wheelPxPerZoomLevel={80}
         style={{ height: "100%", width: "100%", background: theme.bg.editor }}
         minZoom={3}
         maxZoom={8}
       >
         <MapPanes />
+        <MapChrome />
         <StatesLayer picked={picked?.state ?? null} onPick={pickState} />
+        <StateNames picked={picked?.state ?? null} />
         <DismissOnMap enabled={Boolean(picked)} onDismiss={() => setPicked(null)} skipRef={skipDismiss} />
         <Camera tripKey={tripKey} focusId={focusId} />
         {hops.map((hop, index) => (
