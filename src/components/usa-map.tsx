@@ -10,7 +10,7 @@ const UsaMapInner = dynamic(() => import("@/components/usa-map-inner"), {
     <div
       style={{
         height: 420,
-        border: `1px solid ${theme.stroke.secondary}`,
+        border: "none",
         borderRadius: 12,
         background: theme.fill.secondary,
       }}

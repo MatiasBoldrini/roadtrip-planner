@@ -203,8 +203,14 @@ input {
   pointer-events: none;
 }
 
+.usa-map .leaflet-container {
+  border: none;
+  outline: none;
+}
+
 .usa-map .leaflet-interactive {
   cursor: pointer;
+  transition: fill 140ms ease-out, fill-opacity 140ms ease-out, stroke 140ms ease-out;
 }
 
 .place-peek {

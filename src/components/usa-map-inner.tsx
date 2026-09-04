@@ -165,28 +165,21 @@ function boundsFor(names: Set<string>, ids: string[] = [], focusId?: string | nu
 }
 
 const STATE_STYLE = {
-  color: theme.stroke.secondary,
+  color: theme.fill.secondary,
   weight: 1,
   fillColor: theme.fill.secondary,
   fillOpacity: 0.9,
 };
 
-const STATE_HOVER = {
-  color: theme.stroke.secondary,
-  weight: 1,
-  fillColor: theme.accent.primary,
-  fillOpacity: 0.14,
-};
-
-const STATE_PICKED = {
+const STATE_ACTIVE = {
   color: theme.accent.primary,
-  weight: 1.6,
+  weight: 1,
   fillColor: theme.accent.primary,
   fillOpacity: 0.35,
 };
 
 function styleForState(name?: string, picked?: string | null) {
-  if (name && picked === name) return STATE_PICKED;
+  if (name && picked === name) return STATE_ACTIVE;
   return STATE_STYLE;
 }
 
@@ -234,7 +227,7 @@ function StatesLayer({
           mouseover: () => {
             if (!(layer instanceof L.Path)) return;
             if (pickedRef.current === name) return;
-            layer.setStyle(STATE_HOVER);
+            layer.setStyle(STATE_ACTIVE);
             layer.bringToFront();
           },
           mouseout: () => {
@@ -578,7 +571,7 @@ export default function UsaMapInner({
         height: 420,
         width: "100%",
         overflow: "hidden",
-        border: `1px solid ${theme.stroke.secondary}`,
+        border: "none",
         borderRadius: 12,
       }}
     >
