@@ -1,5 +1,6 @@
 "use client";
 
+import NumberFlow from "@number-flow/react";
 import { startTransition, ViewTransition, type ReactNode } from "react";
 import {
   Button,
@@ -726,12 +727,14 @@ function rideCostLabel(ride: RideHop, stops: Stop[]) {
   return formatRange(ride.hop.costLow, ride.hop.costHigh);
 }
 
+const USD_FORMAT = {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+} as const;
+
 const usd = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Math.round(value));
+  new Intl.NumberFormat("en-US", USD_FORMAT).format(Math.round(value));
 
 function Glyph({
   kind,
@@ -1584,6 +1587,42 @@ function DateRuler({ dates }: { dates: string[] }) {
   );
 }
 
+function TripEstimate({ value }: { value: number }) {
+  const theme = useHostTheme();
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 4,
+        padding: "0 16px",
+        textAlign: "center",
+      }}
+    >
+      <Text size="small" tone="tertiary">
+        Estimado
+      </Text>
+      <NumberFlow
+        value={value}
+        locales="en-US"
+        format={USD_FORMAT}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          minHeight: theme.control.height,
+          fontSize: theme.type.lg,
+          fontWeight: 600,
+          letterSpacing: "-0.03em",
+          lineHeight: 1.1,
+          fontVariantNumeric: "tabular-nums",
+          color: theme.text.primary,
+        }}
+      />
+    </div>
+  );
+}
+
 function DateStep({
   label,
   value,
@@ -1599,7 +1638,15 @@ function DateStep({
 }) {
   const theme = useHostTheme();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 4,
+        width: "fit-content",
+      }}
+    >
       <Text size="small" tone="tertiary">
         {label}
       </Text>
@@ -1608,6 +1655,7 @@ function DateStep({
           display: "flex",
           alignItems: "center",
           gap: 4,
+          width: "fit-content",
           height: theme.control.height,
           boxSizing: "border-box",
           background: theme.fill.secondary,
@@ -2382,44 +2430,19 @@ export default function RoadmapApp() {
             marginBottom: 12,
           }}
         >
-          <DateStep
-            label="Salís"
-            value={start}
-            canPrev={applyStart(active, start, addDays(start, -1)).start < start}
-            canNext={applyStart(active, start, addDays(start, 1)).start > start}
-            onStep={(dir) => {
-              const next = applyStart(active, start, addDays(start, dir));
-              persist(next.stops, next.start);
-            }}
-          />
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 4,
-              padding: "0 16px",
-              textAlign: "center",
-            }}
-          >
-            <Text size="small" tone="tertiary">
-              Estimado
-            </Text>
-            <Text
-              weight="semibold"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                minHeight: theme.control.height,
-                fontSize: theme.type.lg,
-                letterSpacing: "-0.03em",
-                lineHeight: 1.1,
-                fontVariantNumeric: "tabular-nums",
+          <div style={{ justifySelf: "start" }}>
+            <DateStep
+              label="Salís"
+              value={start}
+              canPrev={applyStart(active, start, addDays(start, -1)).start < start}
+              canNext={applyStart(active, start, addDays(start, 1)).start > start}
+              onStep={(dir) => {
+                const next = applyStart(active, start, addDays(start, dir));
+                persist(next.stops, next.start);
               }}
-            >
-              {formatRange(tripLow, tripHigh)}
-            </Text>
+            />
           </div>
+          <TripEstimate value={Math.round((tripLow + tripHigh) / 2)} />
           <div style={{ justifySelf: "end" }}>
             <DateStep
               label="Llegás"
