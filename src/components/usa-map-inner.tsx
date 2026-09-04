@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import {
   GeoJSON,
@@ -301,35 +301,62 @@ const AIRPORT: Record<string, string> = {
 
 const PLANE_SVG = `<svg class="usa-city-plane" width="12" height="12" viewBox="0 0 24 24" fill="${theme.category.orange}"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`;
 
-function cityIcon(order: number, name: string, hot: boolean, airport?: string) {
+function cityIcon(order: number, name: string, airport?: string) {
   const label = name.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const extra = airport
     ? `${PLANE_SVG}<span class="usa-city-iata">${airport}</span>`
     : "";
   return L.divIcon({
     className: "usa-city-mark",
-    html: `<span class="usa-city-badge${hot ? " is-hot" : ""}">${order}</span><span class="usa-city-name">${label}${extra}</span>`,
+    html: `<span class="usa-city-badge">${order}</span><span class="usa-city-name">${label}${extra}</span>`,
     iconSize: [200, 28],
     iconAnchor: [14, 14],
   });
 }
 
-const IDLE_DOT = L.divIcon({
-  className: "usa-city-mark is-idle",
-  html: `<span class="usa-city-dot"></span>`,
-  iconSize: [10, 10],
-  iconAnchor: [5, 5],
-});
-
-function idleIcon(name: string, hot: boolean) {
-  if (!hot) return IDLE_DOT;
+function idleIcon(name: string) {
   const label = name.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   return L.divIcon({
-    className: "usa-city-mark is-idle is-hot",
+    className: "usa-city-mark is-idle",
     html: `<span class="usa-city-dot"></span><span class="usa-city-name">${label}</span>`,
     iconSize: [160, 22],
     iconAnchor: [5, 11],
   });
+}
+
+function HotMarker({
+  hot,
+  icon,
+  position,
+  pane,
+  zIndexOffset,
+  interactive = false,
+}: {
+  hot: boolean;
+  icon: L.DivIcon;
+  position: LatLon;
+  pane?: string;
+  zIndexOffset?: number;
+  interactive?: boolean;
+}) {
+  const ref = useRef<L.Marker | null>(null);
+  const apply = () => {
+    const el = ref.current?.getElement();
+    if (!el) return;
+    el.classList.toggle("is-hot", hot);
+  };
+  useLayoutEffect(apply, [hot]);
+  return (
+    <Marker
+      ref={ref}
+      pane={pane}
+      position={position}
+      icon={icon}
+      zIndexOffset={hot ? (zIndexOffset ?? 0) + 80 : zIndexOffset}
+      interactive={interactive}
+      eventHandlers={{ add: apply }}
+    />
+  );
 }
 
 function MapPanes() {
@@ -347,6 +374,7 @@ function Camera({
   focusId?: string | null;
 }) {
   const map = useMap();
+  const tripRef = useRef(tripKey);
 
   useEffect(() => {
     const ids = tripKey.split(",").filter(Boolean);
@@ -355,12 +383,14 @@ function Camera({
       ? new Set([focusState])
       : namesFor(ids);
     const cityFocus = Boolean(focusId && CITY_FOCUS[focusId]);
+    const tripChanged = tripRef.current !== tripKey;
+    tripRef.current = tripKey;
     map.stop();
     map.fitBounds(boundsFor(names, ids, focusId), {
       padding: [32, 32],
       maxZoom: cityFocus ? 8 : focusState ? 7 : 6,
-      animate: true,
-      duration: focusId ? 0.35 : 0.25,
+      animate: tripChanged && !focusId,
+      duration: 0.25,
     });
   }, [focusId, map, tripKey]);
 
@@ -376,19 +406,16 @@ export default function UsaMapInner({
   cities: MapPlace[];
   focusId?: string | null;
 }) {
-  const [heldFocus, setHeldFocus] = useState<string | null>(focusId ?? null);
   const tripKey = stops.map((stop) => stop.city).join(",");
   const tripStates = useMemo(() => namesFor(stops.map((stop) => stop.city)), [tripKey]);
   const chosen = new Set(stops.map((stop) => stop.city));
-
-  useEffect(() => {
-    if (focusId) {
-      setHeldFocus(focusId);
-      return;
+  const idleIcons = useMemo(() => {
+    const icons = new Map<string, L.DivIcon>();
+    for (const city of cities) {
+      icons.set(city.id, idleIcon(city.name));
     }
-    const timer = window.setTimeout(() => setHeldFocus(null), 140);
-    return () => window.clearTimeout(timer);
-  }, [focusId]);
+    return icons;
+  }, [cities]);
 
   const stopsOnMap = stops
     .map((stop) => cities.find((city) => city.id === stop.city))
@@ -442,33 +469,27 @@ export default function UsaMapInner({
         ))}
         {cities.map((city) => {
           if (chosen.has(city.id)) return null;
-          const hot = heldFocus === city.id;
           return (
-            <Marker
+            <HotMarker
               key={city.id}
               pane="cities"
               position={[city.lat, city.lon]}
-              icon={idleIcon(city.name, hot)}
-              zIndexOffset={hot ? 80 : 0}
-              interactive={false}
+              icon={idleIcons.get(city.id) ?? idleIcon(city.name)}
+              hot={focusId === city.id}
+              zIndexOffset={0}
             />
           );
         })}
         {stopsOnMap.map((city, index) => {
           const gateway = index === 0 || index === stopsOnMap.length - 1;
           return (
-            <Marker
+            <HotMarker
               key={`${city.id}-${index}`}
               pane="cities"
               position={[city.lat, city.lon]}
-              icon={cityIcon(
-                index + 1,
-                city.name,
-                heldFocus === city.id,
-                gateway ? AIRPORT[city.id] : undefined,
-              )}
+              icon={cityIcon(index + 1, city.name, gateway ? AIRPORT[city.id] : undefined)}
+              hot={focusId === city.id}
               zIndexOffset={200 + index * 10}
-              interactive={false}
             />
           );
         })}

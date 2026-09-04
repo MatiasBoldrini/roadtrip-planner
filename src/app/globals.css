@@ -109,6 +109,10 @@ input {
   pointer-events: none;
 }
 
+.usa-map .usa-city-mark.is-idle:not(.is-hot) .usa-city-name {
+  visibility: hidden;
+}
+
 .usa-map .usa-city-mark.is-idle.is-hot {
   opacity: 1;
 }
@@ -144,7 +148,7 @@ input {
   box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
 }
 
-.usa-map .usa-city-badge.is-hot {
+.usa-map .usa-city-mark.is-hot .usa-city-badge {
   background: #3d6b9e;
 }
 
