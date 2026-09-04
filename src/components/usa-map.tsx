@@ -22,10 +22,12 @@ export function UsaMap({
   stops,
   cities,
   focusId,
+  onAddCity,
 }: {
   stops: MapStop[];
   cities: MapPlace[];
   focusId?: string | null;
+  onAddCity?: (id: string) => void;
 }) {
-  return <UsaMapInner stops={stops} cities={cities} focusId={focusId} />;
+  return <UsaMapInner stops={stops} cities={cities} focusId={focusId} onAddCity={onAddCity} />;
 }

@@ -171,9 +171,19 @@ const STATE_STYLE = {
   fillOpacity: 0.9,
 };
 
+const STATE_BORDER = {
+  stroke: true,
+  fill: false,
+  color: theme.text.quaternary,
+  weight: 1,
+  opacity: 0.65,
+  lineJoin: "round" as const,
+};
+
 const STATE_ACTIVE = {
   color: theme.accent.primary,
   weight: 1,
+  opacity: 0.9,
   fillColor: theme.accent.primary,
   fillOpacity: 0.35,
 };
@@ -188,82 +198,67 @@ function featureName(layer: L.Layer) {
   return feature?.properties?.name;
 }
 
+type MapPoint = { x: number; y: number };
+
+function pointFrom(event: L.LeafletMouseEvent): MapPoint {
+  return { x: event.containerPoint.x, y: event.containerPoint.y };
+}
+
 function StatesLayer({
-  picked,
-  onPick,
+  hovered,
+  onHover,
+  onLeave,
 }: {
-  picked: string | null;
-  onPick: (name: string) => void;
+  hovered: string | null;
+  onHover: (name: string, point: MapPoint) => void;
+  onLeave: () => void;
 }) {
   const ref = useRef<L.GeoJSON | null>(null);
-  const pickedRef = useRef(picked);
-  pickedRef.current = picked;
+  const hoveredRef = useRef(hovered);
+  hoveredRef.current = hovered;
 
   useEffect(() => {
     const layer = ref.current;
     if (!layer) return;
     layer.eachLayer((child) => {
-      if (child instanceof L.Path) child.setStyle(styleForState(featureName(child), picked));
+      if (child instanceof L.Path) child.setStyle(styleForState(featureName(child), hovered));
     });
-  }, [picked]);
+  }, [hovered]);
 
   return (
     <GeoJSON
       ref={ref}
       data={states}
       bubblingMouseEvents={false}
-      style={(feature) => styleForState(feature?.properties?.name, picked)}
+      style={(feature) => styleForState(feature?.properties?.name, hovered)}
       onEachFeature={(feature, layer) => {
         const name = feature.properties.name;
         const label = () => {
           const el = layer instanceof L.Path ? layer.getElement() : null;
           if (!el) return;
-          el.setAttribute("role", "button");
           el.setAttribute("aria-label", stateLabel(name));
-          el.setAttribute("tabindex", "0");
         };
         layer.on({
           add: label,
-          mouseover: () => {
-            if (!(layer instanceof L.Path)) return;
-            if (pickedRef.current === name) return;
-            layer.setStyle(STATE_ACTIVE);
-            layer.bringToFront();
+          mouseover: (event) => {
+            if (layer instanceof L.Path && hoveredRef.current !== name) {
+              layer.setStyle(STATE_ACTIVE);
+              layer.bringToFront();
+            }
+            onHover(name, pointFrom(event));
           },
+          mousemove: (event) => onHover(name, pointFrom(event)),
           mouseout: () => {
-            if (!(layer instanceof L.Path)) return;
-            layer.setStyle(styleForState(name, pickedRef.current));
-          },
-          click: (event) => {
-            L.DomEvent.stop(event);
-            onPick(name);
+            if (layer instanceof L.Path) {
+              layer.setStyle(styleForState(name, hoveredRef.current));
+            }
+            onLeave();
           },
         });
         label();
       }}
     />
   );
-}
-
-function DismissOnMap({
-  enabled,
-  onDismiss,
-  skipRef,
-}: {
-  enabled: boolean;
-  onDismiss: () => void;
-  skipRef: { current: boolean };
-}) {
-  useMapEvents({
-    click: () => {
-      if (skipRef.current) {
-        skipRef.current = false;
-        return;
-      }
-      if (enabled) onDismiss();
-    },
-  });
-  return null;
 }
 
 type LatLon = [number, number];
@@ -285,29 +280,55 @@ const LABEL_CENTER: Record<string, LatLon> = {
   "West Virginia": [38.6, -80.6],
 };
 
-function ringCentroid(ring: number[][]): LatLon {
-  let lat = 0;
-  let lon = 0;
-  const count = ring.length || 1;
-  for (const point of ring) {
-    lon += point[0] ?? 0;
-    lat += point[1] ?? 0;
+function ringCentroid(ring: number[][]): { area: number; center: LatLon } {
+  let twiceArea = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const x0 = ring[j]?.[0] ?? 0;
+    const y0 = ring[j]?.[1] ?? 0;
+    const x1 = ring[i]?.[0] ?? 0;
+    const y1 = ring[i]?.[1] ?? 0;
+    const cross = x0 * y1 - x1 * y0;
+    twiceArea += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
   }
-  return [lat / count, lon / count];
+  if (Math.abs(twiceArea) < 1e-12) {
+    let lat = 0;
+    let lon = 0;
+    for (const point of ring) {
+      lon += point[0] ?? 0;
+      lat += point[1] ?? 0;
+    }
+    const count = ring.length || 1;
+    return { area: 0, center: [lat / count, lon / count] };
+  }
+  return {
+    area: Math.abs(twiceArea) / 2,
+    center: [cy / (3 * twiceArea), cx / (3 * twiceArea)],
+  };
 }
 
 function featureCentroid(geometry: Geometry): LatLon {
-  let best: number[][] | null = null;
-  const consider = (rings: number[][][]) => {
-    const ring = rings[0];
-    if (!ring || ring.length <= (best?.length ?? 0)) return;
-    best = ring;
-  };
-  if (geometry.type === "Polygon") consider(geometry.coordinates);
-  if (geometry.type === "MultiPolygon") {
-    for (const polygon of geometry.coordinates) consider(polygon);
+  const polygons =
+    geometry.type === "Polygon"
+      ? [geometry.coordinates]
+      : geometry.type === "MultiPolygon"
+        ? geometry.coordinates
+        : [];
+  let area = -1;
+  let center: LatLon = [39, -98];
+  for (const polygon of polygons) {
+    const ring = polygon[0];
+    if (!ring?.length) continue;
+    const next = ringCentroid(ring);
+    if (next.area > area) {
+      area = next.area;
+      center = next.center;
+    }
   }
-  return best ? ringCentroid(best) : [39, -98];
+  return center;
 }
 
 function escapeHtml(value: string) {
@@ -364,26 +385,36 @@ function StateNameMark({
   );
 }
 
-function StateNames({ picked }: { picked: string | null }) {
+function StateNames({
+  picked,
+  allow,
+}: {
+  picked: string | null;
+  allow: Set<string>;
+}) {
   return (
     <>
-      {STATE_LABELS.map((item) => (
+      {STATE_LABELS.filter((item) => allow.has(item.name)).map((item) => (
         <StateNameMark key={item.name} item={item} active={picked === item.name} />
       ))}
     </>
   );
 }
 
-function MapChrome() {
+function MapChrome({ onLeave }: { onLeave: () => void }) {
   const map = useMap();
   const syncZoom = () => {
     const root = map.getContainer().closest(".usa-map");
     if (root instanceof HTMLElement) root.dataset.zoom = String(Math.floor(map.getZoom()));
   };
   useEffect(() => {
-    map.scrollWheelZoom.disable();
+    map.scrollWheelZoom.enable();
     syncZoom();
-  }, [map]);
+    const root = map.getContainer().closest(".usa-map");
+    if (!(root instanceof HTMLElement)) return;
+    root.addEventListener("mouseleave", onLeave);
+    return () => root.removeEventListener("mouseleave", onLeave);
+  }, [map, onLeave]);
   useMapEvents({
     zoom: syncZoom,
     zoomend: syncZoom,
@@ -554,7 +585,8 @@ function HotMarker({
   pane,
   zIndexOffset,
   interactive = false,
-  onClick,
+  onHover,
+  onLeave,
 }: {
   hot: boolean;
   icon: L.DivIcon;
@@ -562,7 +594,8 @@ function HotMarker({
   pane?: string;
   zIndexOffset?: number;
   interactive?: boolean;
-  onClick?: () => void;
+  onHover?: (point: MapPoint) => void;
+  onLeave?: () => void;
 }) {
   const ref = useRef<L.Marker | null>(null);
   const apply = () => {
@@ -578,15 +611,17 @@ function HotMarker({
       position={position}
       icon={icon}
       zIndexOffset={hot ? (zIndexOffset ?? 0) + 80 : zIndexOffset}
-      interactive={interactive || Boolean(onClick)}
+      interactive={interactive || Boolean(onHover)}
       eventHandlers={{
         add: apply,
-        click: onClick
+        mouseover: onHover
           ? (event) => {
               L.DomEvent.stop(event);
-              onClick();
+              onHover(pointFrom(event));
             }
           : undefined,
+        mousemove: onHover ? (event) => onHover(pointFrom(event)) : undefined,
+        mouseout: onLeave,
       }}
     />
   );
@@ -629,17 +664,25 @@ function Camera({
   return null;
 }
 
+function firstCityInState(state: string, cities: MapPlace[], chosen: Set<string>) {
+  const matches = cities.filter((city) => STATE_BY_CITY[city.id] === state);
+  return matches.find((city) => !chosen.has(city.id)) ?? matches[0];
+}
+
 export default function UsaMapInner({
   stops,
   cities,
   focusId,
+  onAddCity,
 }: {
   stops: MapStop[];
   cities: MapPlace[];
   focusId?: string | null;
+  onAddCity?: (id: string) => void;
 }) {
   const tripKey = stops.map((stop) => stop.city).join(",");
   const tripStates = useMemo(() => namesFor(stops.map((stop) => stop.city)), [tripKey]);
+  const labeledStates = useMemo(() => namesFor(cities.map((city) => city.id)), [cities]);
   const chosen = new Set(stops.map((stop) => stop.city));
   const idleIcons = useMemo(() => {
     const icons = new Map<string, L.DivIcon>();
@@ -662,31 +705,96 @@ export default function UsaMapInner({
     stops.map((stop) => stop.city),
   );
 
-  const [picked, setPicked] = useState<PlacePick | null>(null);
-  const skipDismiss = useRef(false);
+  const [hovered, setHovered] = useState<PlacePick | null>(null);
+  const tipRef = useRef<HTMLElement>(null);
+  const tipPoint = useRef<MapPoint>({ x: 16, y: 16 });
+  const hideTimer = useRef<number | null>(null);
 
-  const pickState = useCallback((name: string) => {
-    skipDismiss.current = true;
-    setPicked((prev) => {
-      if (prev && prev.state === name && prev.wiki === wikiTitleForState(name)) return null;
-      return {
-        state: name,
-        title: stateLabel(name),
-        subtitle: name === "Panama" ? "Centroamérica" : "Estados Unidos",
-        wiki: wikiTitleForState(name),
-      };
-    });
+  const placeTip = useCallback((point: MapPoint) => {
+    tipPoint.current = point;
+    const el = tipRef.current;
+    const parent = el?.offsetParent;
+    if (!el || !(parent instanceof HTMLElement)) return;
+    const left = Math.max(10, Math.min(point.x + 16, parent.clientWidth - el.offsetWidth - 10));
+    const top = Math.max(10, Math.min(point.y + 16, parent.clientHeight - el.offsetHeight - 10));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
   }, []);
 
-  const pickCity = useCallback((city: MapPlace) => {
-    skipDismiss.current = true;
-    const state = STATE_BY_CITY[city.id] ?? city.state;
-    setPicked({
-      state,
-      title: city.name,
-      subtitle: stateLabel(state) === city.name ? "En el itinerario" : stateLabel(state),
-      wiki: wikiTitleForCity(city.id, state),
-    });
+  const hoverPlace = useCallback(
+    (place: PlacePick, point: MapPoint) => {
+      if (hideTimer.current) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+      setHovered((prev) => {
+        if (prev && prev.state === place.state && prev.wiki === place.wiki && prev.cityId === place.cityId) {
+          return prev;
+        }
+        tipPoint.current = point;
+        return place;
+      });
+    },
+    [],
+  );
+
+  const stayPlace = useCallback(() => {
+    if (hideTimer.current) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  }, []);
+
+  const leavePlace = useCallback(() => {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current = null;
+      setHovered(null);
+    }, 180);
+  }, []);
+
+  const hoverState = useCallback(
+    (name: string, point: MapPoint) => {
+      const city = firstCityInState(name, cities, chosen);
+      hoverPlace(
+        {
+          state: name,
+          title: stateLabel(name),
+          subtitle: name === "Panama" ? "Centroamérica" : "Estados Unidos",
+          wiki: wikiTitleForState(name),
+          cityId: city?.id,
+        },
+        point,
+      );
+    },
+    [cities, chosen, hoverPlace],
+  );
+
+  const hoverCity = useCallback(
+    (city: MapPlace, point: MapPoint) => {
+      const state = STATE_BY_CITY[city.id] ?? city.state;
+      hoverPlace(
+        {
+          state,
+          title: city.name,
+          subtitle: stateLabel(state) === city.name ? "En el itinerario" : stateLabel(state),
+          wiki: wikiTitleForCity(city.id, state),
+          cityId: city.id,
+        },
+        point,
+      );
+    },
+    [hoverPlace],
+  );
+
+  useLayoutEffect(() => {
+    if (hovered) placeTip(tipPoint.current);
+  }, [hovered, placeTip]);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    };
   }, []);
 
   return (
@@ -702,7 +810,7 @@ export default function UsaMapInner({
     >
       <MapContainer
         bounds={startBounds}
-        scrollWheelZoom={false}
+        scrollWheelZoom
         attributionControl={false}
         zoomSnap={0.5}
         zoomDelta={0.5}
@@ -711,10 +819,14 @@ export default function UsaMapInner({
         maxZoom={8}
       >
         <MapPanes />
-        <MapChrome />
-        <StatesLayer picked={picked?.state ?? null} onPick={pickState} />
-        <StateNames picked={picked?.state ?? null} />
-        <DismissOnMap enabled={Boolean(picked)} onDismiss={() => setPicked(null)} skipRef={skipDismiss} />
+        <MapChrome onLeave={leavePlace} />
+        <StatesLayer
+          hovered={hovered?.state ?? null}
+          onHover={hoverState}
+          onLeave={leavePlace}
+        />
+        <GeoJSON data={states} interactive={false} style={STATE_BORDER} />
+        <StateNames picked={hovered?.state ?? null} allow={labeledStates} />
         <Camera tripKey={tripKey} focusId={focusId} />
         {hops.map((hop, index) => (
           <HopLine
@@ -736,6 +848,8 @@ export default function UsaMapInner({
               icon={idleIcons.get(city.id) ?? idleIcon(city.name)}
               hot={focusId === city.id}
               zIndexOffset={0}
+              onHover={(point) => hoverCity(city, point)}
+              onLeave={leavePlace}
             />
           );
         })}
@@ -749,13 +863,22 @@ export default function UsaMapInner({
               icon={cityIcon(index + 1, city.name, gateway ? AIRPORT[city.id] : undefined)}
               hot={focusId === city.id}
               zIndexOffset={200 + index * 10}
-              onClick={() => pickCity(city)}
+              onHover={(point) => hoverCity(city, point)}
+              onLeave={leavePlace}
             />
           );
         })}
       </MapContainer>
-      {picked ? (
-        <PlacePeek key={`${picked.state}-${picked.wiki}`} place={picked} onClose={() => setPicked(null)} />
+      {hovered ? (
+        <PlacePeek
+          place={hovered}
+          tipRef={tipRef}
+          canAdd={Boolean(hovered.cityId && onAddCity)}
+          added={Boolean(hovered.cityId && chosen.has(hovered.cityId))}
+          onAdd={hovered.cityId && onAddCity ? () => onAddCity(hovered.cityId as string) : undefined}
+          onEnter={stayPlace}
+          onLeave={leavePlace}
+        />
       ) : null}
     </div>
   );

@@ -1767,6 +1767,37 @@ function DateStep({
   );
 }
 
+type ItineraryDock = "below" | "side";
+
+function DockToggle({
+  value,
+  onChange,
+}: {
+  value: ItineraryDock;
+  onChange: (next: ItineraryDock) => void;
+}) {
+  return (
+    <Row gap={4} align="center">
+      <Pill
+        size="sm"
+        active={value === "below"}
+        onClick={() => onChange("below")}
+        title="Itinerario debajo del mapa"
+      >
+        Abajo
+      </Pill>
+      <Pill
+        size="sm"
+        active={value === "side"}
+        onClick={() => onChange("side")}
+        title="Itinerario a la derecha"
+      >
+        Al costado
+      </Pill>
+    </Row>
+  );
+}
+
 function RoadPills({
   stops,
   rulerStops,
@@ -2124,6 +2155,7 @@ export default function RoadmapApp() {
     }
   }, [storedExtras]);
   const [legacy] = useCanvasState<Block[]>("blocks", []);
+  const [dock, setDock] = useCanvasState<ItineraryDock>("itineraryDock", "below");
   const dragRef = useRef<Drag | null>(null);
   const trackHost = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -2317,7 +2349,7 @@ export default function RoadmapApp() {
     <Stack
       gap={36}
       style={{
-        maxWidth: 1280,
+        maxWidth: dock === "side" ? 1440 : 1280,
         margin: "0 auto",
         padding: "36px 28px 56px",
         background: theme.bg.editor,
@@ -2330,8 +2362,6 @@ export default function RoadmapApp() {
         </Text>
         <H1>Roadmap</H1>
       </div>
-
-      <UsaMap stops={active} cities={CITIES} focusId={focusCity} />
 
       <div>
         <div
@@ -2498,6 +2528,15 @@ export default function RoadmapApp() {
         </div>
       </div>
 
+      <div className={dock === "side" ? "itinerary-shell is-side" : "itinerary-shell"}>
+      <div className="itinerary-main">
+      <UsaMap
+        stops={active}
+        cities={CITIES}
+        focusId={focusCity}
+        onAddCity={(id) => persist(insertTaking(active, active.length, id))}
+      />
+
       <div ref={trackHost}>
         <div
           style={{
@@ -2555,9 +2594,13 @@ export default function RoadmapApp() {
           onRemove={(index) => persist(removeGiving(active, index))}
         />
       </div>
+      </div>
 
-      <div>
-        <H2>Itinerario</H2>
+      <div className="itinerary-aside">
+        <Row align="center" justify="space-between" gap={12} wrap>
+          <H2>Itinerario</H2>
+          <DockToggle value={dock} onChange={setDock} />
+        </Row>
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 2 }}>
           {(() => {
             const rows: Array<{
@@ -2645,6 +2688,7 @@ export default function RoadmapApp() {
             );
           })()}
         </div>
+      </div>
       </div>
 
       <div>
