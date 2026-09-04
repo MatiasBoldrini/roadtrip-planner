@@ -153,7 +153,7 @@ function absUrl(src?: string) {
   return null;
 }
 
-function srcsetUrl(srcset: WikiMedia["items"] extends Array<infer T> | undefined ? T["srcset"] : never) {
+function srcsetUrl(srcset?: { src?: string } | Array<{ src?: string }>) {
   if (!srcset) return null;
   if (Array.isArray(srcset)) {
     const best = [...srcset].reverse().find((item) => item.src) ?? srcset[0];

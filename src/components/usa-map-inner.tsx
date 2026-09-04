@@ -185,10 +185,6 @@ const STATE_PICKED = {
   fillOpacity: 0.35,
 };
 
-const STATE_RENDERER = L.svg({
-  padding: 0.5,
-});
-
 function styleForState(name?: string, picked?: string | null) {
   if (name && picked === name) return STATE_PICKED;
   return STATE_STYLE;
@@ -222,7 +218,6 @@ function StatesLayer({
     <GeoJSON
       ref={ref}
       data={states}
-      renderer={STATE_RENDERER}
       bubblingMouseEvents={false}
       style={(feature) => styleForState(feature?.properties?.name, picked)}
       onEachFeature={(feature, layer) => {
