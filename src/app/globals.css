@@ -68,12 +68,12 @@ input {
 }
 
 .region-option.is-active {
-  background: #3d6b9e;
-  color: #fff;
+  background: #f0f0f0;
+  color: #171717;
 }
 
 .region-option.is-active:hover {
-  background: #335a85;
+  background: #e4e4e4;
 }
 
 .ui-chip {

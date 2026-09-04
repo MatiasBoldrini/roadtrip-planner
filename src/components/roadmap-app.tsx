@@ -881,9 +881,9 @@ function hopKind(mode: Mode): "plane" | "train" | "local" {
 }
 
 const REGION_OPTIONS: { id: "este" | "sur" | "oeste"; label: string }[] = [
-  { id: "este", label: "Este" },
-  { id: "sur", label: "Sur" },
-  { id: "oeste", label: "Oeste" },
+  { id: "este", label: "Costa Este" },
+  { id: "sur", label: "Costa Sur" },
+  { id: "oeste", label: "Costa Oeste" },
 ];
 
 function regionId(filter: Filter): "este" | "sur" | "oeste" {
@@ -923,7 +923,7 @@ function RegionFilter({
     <div ref={root} style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
-        className="ui-pill is-active is-inline"
+        className="ui-pill is-inline"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Filtrar por costa"
@@ -938,14 +938,14 @@ function RegionFilter({
           border: "none",
           borderRadius: theme.control.radius,
           padding: "0 8px 0 6px",
-          color: theme.text.onAccent,
+          color: theme.text.primary,
           font: "inherit",
           fontSize: theme.type.sm,
           cursor: "pointer",
         }}
       >
-        <Glyph kind="filter" color={theme.text.onAccent} size={12} />
-        Costa
+        <Glyph kind="filter" color={theme.text.tertiary} size={12} />
+        {REGION_OPTIONS.find((option) => option.id === selected)?.label ?? "Costa Este"}
       </button>
       {open ? (
         <div
@@ -2150,9 +2150,9 @@ function CityPicker({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
-                minHeight: 36,
-                padding: "0 12px",
+                gap: 10,
+                minHeight: 48,
+                padding: "12px 14px",
                 borderBottom: index === cities.length - 1 ? "none" : `1px solid ${theme.stroke.tertiary}`,
                 color: used ? theme.text.tertiary : theme.text.primary,
                 cursor: used ? "default" : grabbing ? "grabbing" : "pointer",
