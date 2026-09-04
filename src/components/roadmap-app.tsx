@@ -1590,36 +1590,24 @@ function DateRuler({ dates }: { dates: string[] }) {
 function TripEstimate({ value }: { value: number }) {
   const theme = useHostTheme();
   return (
-    <div
+    <NumberFlow
+      value={value}
+      locales="en-US"
+      format={USD_FORMAT}
+      aria-label="Estimado"
       style={{
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
-        gap: 4,
+        justifyContent: "center",
         padding: "0 16px",
-        textAlign: "center",
+        fontSize: 32,
+        fontWeight: 650,
+        letterSpacing: "-0.04em",
+        lineHeight: 1,
+        fontVariantNumeric: "tabular-nums",
+        color: theme.text.primary,
       }}
-    >
-      <Text size="small" tone="tertiary">
-        Estimado
-      </Text>
-      <NumberFlow
-        value={value}
-        locales="en-US"
-        format={USD_FORMAT}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          minHeight: theme.control.height,
-          fontSize: theme.type.lg,
-          fontWeight: 600,
-          letterSpacing: "-0.03em",
-          lineHeight: 1.1,
-          fontVariantNumeric: "tabular-nums",
-          color: theme.text.primary,
-        }}
-      />
-    </div>
+    />
   );
 }
 
