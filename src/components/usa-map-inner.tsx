@@ -737,38 +737,21 @@ export default function UsaMapInner({
   );
 
   const [hovered, setHovered] = useState<PlacePick | null>(null);
-  const tipRef = useRef<HTMLElement>(null);
-  const tipPoint = useRef<MapPoint>({ x: 16, y: 16 });
   const hideTimer = useRef<number | null>(null);
 
-  const placeTip = useCallback((point: MapPoint) => {
-    tipPoint.current = point;
-    const el = tipRef.current;
-    const parent = el?.offsetParent;
-    if (!el || !(parent instanceof HTMLElement)) return;
-    const left = Math.max(10, Math.min(point.x + 16, parent.clientWidth - el.offsetWidth - 10));
-    const top = Math.max(10, Math.min(point.y + 16, parent.clientHeight - el.offsetHeight - 10));
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  }, []);
-
-  const hoverPlace = useCallback(
-    (place: PlacePick, point: MapPoint) => {
-      prefetchPlaceMedia(place.wiki);
-      if (hideTimer.current) {
-        window.clearTimeout(hideTimer.current);
-        hideTimer.current = null;
+  const hoverPlace = useCallback((place: PlacePick) => {
+    prefetchPlaceMedia(place.wiki);
+    if (hideTimer.current) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+    setHovered((prev) => {
+      if (prev && prev.state === place.state && prev.wiki === place.wiki && prev.cityId === place.cityId) {
+        return prev;
       }
-      setHovered((prev) => {
-        if (prev && prev.state === place.state && prev.wiki === place.wiki && prev.cityId === place.cityId) {
-          return prev;
-        }
-        tipPoint.current = point;
-        return place;
-      });
-    },
-    [],
-  );
+      return place;
+    });
+  }, []);
 
   const stayPlace = useCallback(() => {
     if (hideTimer.current) {
@@ -789,43 +772,33 @@ export default function UsaMapInner({
   }, [focusId]);
 
   const hoverState = useCallback(
-    (name: string, point: MapPoint) => {
+    (name: string, _point: MapPoint) => {
       const city = firstCityInState(name, cities, chosen);
-      hoverPlace(
-        {
-          state: name,
-          title: stateLabel(name),
-          subtitle: name === "Panama" ? "Centroamérica" : "Estados Unidos",
-          wiki: wikiTitleForState(name),
-          cityId: city?.id,
-        },
-        point,
-      );
+      hoverPlace({
+        state: name,
+        title: stateLabel(name),
+        subtitle: name === "Panama" ? "Centroamérica" : "Estados Unidos",
+        wiki: wikiTitleForState(name),
+        cityId: city?.id,
+      });
     },
     [cities, chosen, hoverPlace],
   );
 
   const hoverCity = useCallback(
-    (city: MapPlace, point: MapPoint) => {
+    (city: MapPlace, _point: MapPoint) => {
       const state = STATE_BY_CITY[city.id] ?? city.state;
       onFocusCity?.(city.id);
-      hoverPlace(
-        {
-          state,
-          title: city.name,
-          subtitle: stateLabel(state) === city.name ? "En el itinerario" : stateLabel(state),
-          wiki: wikiTitleForCity(city.id, state),
-          cityId: city.id,
-        },
-        point,
-      );
+      hoverPlace({
+        state,
+        title: city.name,
+        subtitle: stateLabel(state) === city.name ? "En el itinerario" : stateLabel(state),
+        wiki: wikiTitleForCity(city.id, state),
+        cityId: city.id,
+      });
     },
     [hoverPlace, onFocusCity],
   );
-
-  useLayoutEffect(() => {
-    if (hovered) placeTip(tipPoint.current);
-  }, [hovered, placeTip]);
 
   useEffect(() => {
     return () => {
@@ -909,7 +882,6 @@ export default function UsaMapInner({
       {hovered ? (
         <PlacePeek
           place={hovered}
-          tipRef={tipRef}
           canAdd={Boolean(hovered.cityId && onAddCity)}
           added={Boolean(hovered.cityId && chosen.has(hovered.cityId))}
           onAdd={hovered.cityId && onAddCity ? () => onAddCity(hovered.cityId as string) : undefined}

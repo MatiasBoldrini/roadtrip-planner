@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Ref } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 export type PlacePick = {
@@ -103,8 +103,8 @@ const CITY_WIKI: Record<string, string> = {
   aus: "Austin,_Texas",
   hou: "Houston",
   sat: "San_Antonio",
-  pty: "Panama_City",
-  boc: "Bocas_del_Toro",
+  pty: "Panama_City,_Panama",
+  boc: "Bocas_del_Toro_Province",
   bqt: "Boquete,_Panama",
   sfo: "San_Francisco",
   lax: "Los_Angeles",
@@ -115,11 +115,22 @@ const CITY_WIKI: Record<string, string> = {
   phx: "Phoenix,_Arizona",
 };
 
+const PHOTO_WIKI: Record<string, string> = {
+  Las_Vegas: "Las_Vegas_Strip",
+  Miami: "South_Beach_(Miami)",
+  San_Francisco: "Golden_Gate_Bridge",
+  "Los_Angeles": "Hollywood_Sign",
+  "New_Orleans": "French_Quarter",
+  "San_Antonio": "San_Antonio_River_Walk",
+  "Washington,_D.C.": "National_Mall",
+  "Panama_City,_Panama": "Casco_Viejo,_Panama",
+};
+
 const FALLBACK_PHOTOS = [
-  "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fm=webp&fit=crop&w=500&q=70",
-  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fm=webp&fit=crop&w=500&q=70",
-  "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fm=webp&fit=crop&w=500&q=70",
-  "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1534430480872-3498386e7856?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1514214246283-afecd6218873?auto=format&fm=webp&fit=crop&w=500&q=70",
+  "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fm=webp&fit=crop&w=500&q=70",
 ];
 
 const WIKI_STEPS = [20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840];
@@ -203,10 +214,35 @@ type WikiSummary = {
 };
 
 const SKIP_IMAGE =
-  /\bflags?\b|[_ ]flags?\b|flag_of|seal_of|\bseals?\b|coat[_ ]of[_ ]arms|state[_ ]arms|locator|map_of|geo[_ ]map|diagram|population|census|gdp|income|ethnic|koppen|climate|wordmark|\blogos?\b|signature|state[_ ]quarter|\bcoins?\b|postage|proof\.png|banner[_ ]of|municipalities|counties[_ ]by|density|demograph|election|\bvote\b|governor|portrait|headshot|3x4|mugshot|crash|wreck|disaster|9-11|9_11|flight_93|flight_175|ambox|padlock|pictogram|commons-logo/i;
+  /\bflags?\b|[_ ]flags?\b|flag_of|seal_of|\bseals?\b|coat[_ ]of[_ ]arms|state[_ ]arms|locator|map_of|geo[_ ]map|diagram|population|census|gdp|income|ethnic|koppen|climate|wordmark|\blogos?\b|signature|state[_ ]quarter|\bcoins?\b|postage|proof\.png|banner[_ ]of|municipalities|counties[_ ]by|density|demograph|election|\bvote\b|governor|portrait|headshot|3x4|mugshot|crash|wreck|disaster|9-11|9_11|flight_93|flight_175|ambox|padlock|pictogram|commons-logo|panama[_ ]papers|flower|blossom|wildflower|bus[_ ]picture|\brtc\b|equestrian|quetzal|wildlife|bird_|_bird|insect|newspaper|document/i;
+
+const ICONIC_IMAGE =
+  /skyline|cityscape|from[_ ]above|at[_ ]night|night[_ ]falls|dusk|twilight|downtown|the[_ ]strip|vegas[_ ]strip|times[_ ]square|golden[_ ]gate|hollywood[_ ]sign|griffith|space[_ ]needle|kerry[_ ]park|statue[_ ]of[_ ]liberty|empire[_ ]state|brooklyn[_ ]bridge|lincoln[_ ]memorial|national[_ ]mall|united[_ ]states[_ ]capitol|us[_ ]capitol|french[_ ]quarter|jackson[_ ]square|south[_ ]beach|ocean[_ ]drive|brickell|river[_ ]walk|the[_ ]alamo|\balamo\b|inner[_ ]harbor|navy[_ ]pier|cloud[_ ]gate|millennium[_ ]park|castillo|old[_ ]port|duquesne|bellagio|fabulous[_ ]las|high[_ ]roller|paris[_ ]las|luxor|fountains[_ ]of/i;
 
 const PLACE_IMAGE =
-  /skyline|downtown|park|beach|capitol|bridge|canyon|falls|waterfall|mountain|river|harbor|harbour|coast|island|desert|lake|cityscape|lighthouse|cathedral|basilica|mission|alamo|statue|tower|plaza|square|boardwalk|pier|valley|monument|memorial|waterfront|national[_ ]park|state[_ ]park|hill[_ ]country|everglades|yosemite|liberty|golden[_ ]gate|times[_ ]square|french[_ ]quarter|south[_ ]beach|river[_ ]walk/i;
+  /skyline|downtown|beach|capitol|bridge|falls|waterfall|harbor|harbour|coast|cityscape|lighthouse|cathedral|basilica|mission|alamo|tower|boardwalk|pier|monument|memorial|waterfront|liberty|golden[_ ]gate|times[_ ]square|french[_ ]quarter|south[_ ]beach|river[_ ]walk|aerial|night/i;
+
+const GENERIC_NATURE =
+  /mountain|desert|canyon|wilderness|conservation[_ ]area|chaparral|cactus|mesa|butte|trail|forest|valley[_ ]view|red[_ ]rock|spring[_ ]flowers/i;
+
+const WEAK_IMAGE =
+  /stadium|arena|casino|airport|terminal|ship[_ ]channel|oil[_ ]well|control[_ ]tower|urban[_ ]sprawl|city[_ ]hall|depot|railway|train[_ ]station|ca\.?\s*19|19[0-4]\d|statue[_ ]of|equestrian|ferry_b|zeppelin/i;
+
+const PLACE_LOOK: Record<string, RegExp> = {
+  Las_Vegas: /strip|bellagio|from[_ ]above|night|skyline|fabulous|luxor|paris/i,
+  Miami: /south[_ ]beach|ocean[_ ]drive|brickell|downtown[_ ]miami|skyline/i,
+  San_Francisco: /golden[_ ]gate|painted[_ ]ladies|transamerica|alcatraz|skyline/i,
+  Los_Angeles: /hollywood|griffith|downtown[_ ]los|skyline/i,
+  Seattle: /space[_ ]needle|kerry[_ ]park|pike|skyline|seattle[_ ]center/i,
+  Chicago: /skyline|navy[_ ]pier|bean|millennium|lake[_ ]michigan|river/i,
+  "New_Orleans": /french[_ ]quarter|bourbon|jackson[_ ]square|skyline/i,
+  "San_Antonio": /river[_ ]walk|alamo|skyline/i,
+  "Washington,_D.C.": /capitol|lincoln|mall|monument|jefferson/i,
+  "New_York_City": /empire|liberty|times[_ ]square|brooklyn[_ ]bridge|skyline|midtown/i,
+  Boston: /skyline|harbor|charles|beacon/i,
+  "Panama_City,_Panama": /skyline|casco|canal|downtown/i,
+  Niagara_Falls: /falls|horseshoe|niagara/i,
+};
 
 function absUrl(src?: string) {
   if (!src) return null;
@@ -229,31 +265,44 @@ function imageHaystack(item: WikiMediaItem) {
   return `${item.title ?? ""} ${item.caption?.text ?? ""}`;
 }
 
-function scoreScenicPhoto(item: WikiMediaItem, url: string) {
-  const hay = imageHaystack(item);
+function scoreScenicPhoto(item: WikiMediaItem, url: string, wiki: string) {
+  const hay = `${imageHaystack(item)} ${url}`;
   if (SKIP_IMAGE.test(hay) || /\.svg/i.test(`${item.title ?? ""} ${url}`)) return null;
   if (/\b1[6-9]\d{2}\b/.test(item.title ?? "")) return null;
   let score = 1;
-  if (PLACE_IMAGE.test(hay)) score += 6;
+  if (PLACE_LOOK[wiki]?.test(hay)) score += 16;
+  if (ICONIC_IMAGE.test(hay)) score += 12;
+  if (PLACE_IMAGE.test(hay)) score += 4;
   if (/\.jpe?g/i.test(`${item.title ?? ""} ${url}`)) score += 2;
-  if (/popular tourist|most recognized|iconic|skyline|national park/i.test(hay)) score += 3;
-  if (/stadium|arena|casino|airport|terminal|ship_channel|oil_well/i.test(hay)) score -= 3;
-  return score;
+  if (/popular tourist|most recognized|iconic/i.test(hay)) score += 3;
+  const natureOk = /Niagara_Falls|Boquete|Yosemite|Everglades/.test(wiki);
+  if (!natureOk && GENERIC_NATURE.test(hay)) score -= 12;
+  if (WEAK_IMAGE.test(hay)) score -= 8;
+  return score < 1 ? null : score;
 }
 
-function pickScenicPhotos(items: WikiMediaItem[]) {
+function pickScenicPhotos(items: WikiMediaItem[], wiki: string) {
   const ranked: Array<{ score: number; url: string }> = [];
   for (const item of items) {
     if (item.type !== "image") continue;
     const url = srcsetUrl(item.srcset);
     if (!url) continue;
-    const score = scoreScenicPhoto(item, url);
+    const score = scoreScenicPhoto(item, url, wiki);
     if (score == null) continue;
     if (ranked.some((entry) => entry.url === url)) continue;
     ranked.push({ score, url });
   }
   ranked.sort((a, b) => b.score - a.score);
   return ranked.slice(0, 4).map((entry) => entry.url);
+}
+
+function leadPhoto(summary: WikiSummary | null, wiki: string) {
+  const url = absUrl(summary?.originalimage?.source ?? summary?.thumbnail?.source);
+  if (!url) return null;
+  const hay = `${url} ${wiki}`;
+  if (SKIP_IMAGE.test(hay) || WEAK_IMAGE.test(hay) || GENERIC_NATURE.test(hay)) return null;
+  if (PLACE_LOOK[wiki]?.test(hay) || ICONIC_IMAGE.test(hay) || PLACE_IMAGE.test(hay)) return url;
+  return null;
 }
 
 const mediaCache = new Map<string, { photos: string[]; blurb: string }>();
@@ -292,20 +341,30 @@ async function loadPlaceMedia(wiki: string, signal: AbortSignal) {
   const cached = mediaCache.get(wiki);
   if (cached) return cached;
 
+  const extraTitle = PHOTO_WIKI[wiki];
   const title = encodeURIComponent(wiki);
-  const [summary, media] = await Promise.all([
+  const [summary, media, extra] = await Promise.all([
     wikiJson<WikiSummary>(`page/summary/${title}`, signal),
     wikiJson<WikiMedia>(`page/media-list/${title}`, signal),
+    extraTitle
+      ? wikiJson<WikiMedia>(`page/media-list/${encodeURIComponent(extraTitle)}`, signal)
+      : Promise.resolve(null),
   ]);
   const blurb = summary?.extract ?? "";
-  let photos = pickScenicPhotos(media?.items ?? []);
+  const items = [...(media?.items ?? []), ...(extra?.items ?? [])];
+  let photos = pickScenicPhotos(items, wiki);
+  const lead = leadPhoto(summary, wiki);
+  if (lead) {
+    photos = [lead, ...photos.filter((url) => url !== lead)].slice(0, 4);
+  }
 
   if (!photos.length) {
-    const extra = await wikiJson<WikiMedia>(
+    const tourism = await wikiJson<WikiMedia>(
       `page/media-list/${encodeURIComponent(tourismWiki(wiki))}`,
       signal,
     );
-    photos = pickScenicPhotos(extra?.items ?? []);
+    photos = pickScenicPhotos(tourism?.items ?? [], wiki);
+    if (lead) photos = [lead, ...photos.filter((url) => url !== lead)].slice(0, 4);
   }
 
   const next = {
@@ -326,7 +385,6 @@ export function youtubeSearchUrl(place: PlacePick) {
 
 export function PlacePeek({
   place,
-  tipRef,
   canAdd,
   added,
   onAdd,
@@ -334,7 +392,6 @@ export function PlacePeek({
   onLeave,
 }: {
   place: PlacePick;
-  tipRef?: Ref<HTMLElement>;
   canAdd?: boolean;
   added?: boolean;
   onAdd?: () => void;
@@ -364,20 +421,19 @@ export function PlacePeek({
 
   return (
     <aside
-      ref={tipRef}
       className="place-peek"
       aria-label={place.title}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <div className="place-peek-hero">
+      <div className="place-peek-media">
         {hero ? (
           <Image
             key={hero}
             src={hero}
             alt=""
             fill
-            sizes="268px"
+            sizes="196px"
             className={`place-peek-photo${photoOn ? " is-ready" : ""}`}
             referrerPolicy="no-referrer"
             priority
@@ -385,35 +441,53 @@ export function PlacePeek({
             onLoad={() => setPhotoOn(true)}
           />
         ) : null}
-      </div>
-      <div className="place-peek-copy">
-        {stateLabel(place.state) !== place.title ? (
-          <p className="place-peek-kicker">{stateLabel(place.state)}</p>
-        ) : null}
-        <h3 className="place-peek-title">{place.title}</h3>
-        {place.subtitle && place.subtitle !== place.title && place.subtitle !== stateLabel(place.state) ? (
-          <p className="place-peek-sub">{place.subtitle}</p>
-        ) : null}
-        <div className="place-peek-actions">
-          {canAdd ? (
-            <button
-              type="button"
-              className="place-peek-cta is-add"
-              disabled={added}
-              onClick={onAdd}
-            >
-              {added ? "Ya está en el viaje" : "Agregar al viaje"}
-            </button>
+        <div className="place-peek-fade" aria-hidden />
+        <div className="place-peek-copy">
+          {stateLabel(place.state) !== place.title ? (
+            <p className="place-peek-kicker">{stateLabel(place.state)}</p>
           ) : null}
-          <a
-            className="place-peek-cta is-info"
-            href={youtubeSearchUrl(place)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Ver más info
-          </a>
+          <h3 className="place-peek-title">{place.title}</h3>
+          {place.subtitle && place.subtitle !== place.title && place.subtitle !== stateLabel(place.state) ? (
+            <p className="place-peek-sub">{place.subtitle}</p>
+          ) : null}
         </div>
+        {canAdd ? (
+          <button
+            type="button"
+            className="place-peek-orb"
+            disabled={added}
+            aria-label={added ? "Ya está en el viaje" : "Agregar al viaje"}
+            onClick={onAdd}
+          >
+            {added ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M5 12.5 10 17.5 19 7.5"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M12 5v14M5 12h14"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+        ) : null}
+        <a
+          className="place-peek-hit"
+          href={youtubeSearchUrl(place)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Ver más info de ${place.title}`}
+        />
       </div>
     </aside>
   );

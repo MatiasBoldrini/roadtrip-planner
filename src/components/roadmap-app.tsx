@@ -2421,108 +2421,6 @@ export default function RoadmapApp() {
 
       <Divider />
 
-      <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            className="search-bar"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              flex: "1 1 420px",
-              minWidth: 260,
-              maxWidth: 560,
-              height: theme.control.height,
-              border: `1px solid ${theme.stroke.primary}`,
-              borderRadius: theme.control.radius,
-              background: theme.bg.elevated,
-              padding: "0 6px 0 10px",
-            }}
-            onClick={(event) => {
-              if ((event.target as HTMLElement).closest("button")) return;
-              searchRef.current?.focus();
-            }}
-          >
-            <span style={{ display: "flex", flexShrink: 0, pointerEvents: "none" }}>
-              <Glyph kind="search" color={theme.text.tertiary} size={14} />
-            </span>
-            <input
-              ref={searchRef}
-              type="search"
-              value={query}
-              placeholder="Buscar ciudad"
-              aria-label="Buscar ciudad"
-              onChange={(event) => {
-                setQuery(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setQuery("");
-                  setFocusCity(null);
-                  return;
-                }
-                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                  event.preventDefault();
-                  const index = pool.findIndex((city) => city.id === focusCity);
-                  const next =
-                    event.key === "ArrowDown"
-                      ? pool[index < 0 ? 0 : Math.min(pool.length - 1, index + 1)]
-                      : pool[index < 0 ? pool.length - 1 : Math.max(0, index - 1)];
-                  if (next) setFocusCity(next.id);
-                  pickerRef.current?.focus();
-                  return;
-                }
-                if (event.key !== "Enter") return;
-                const chosen =
-                  (focusCity && pool.find((city) => city.id === focusCity && !active.some((stop) => stop.city === city.id))) ||
-                  pool.find((city) => !active.some((stop) => stop.city === city.id));
-                if (!chosen) return;
-                persist(insertTaking(active, active.length, chosen.id));
-                setQuery("");
-                setFocusCity(null);
-              }}
-              style={{
-                flex: 1,
-                minWidth: 72,
-                height: "100%",
-                border: "none",
-                background: "transparent",
-                color: theme.text.primary,
-                padding: 0,
-                font: "inherit",
-                fontSize: theme.type.sm,
-                outline: "none",
-              }}
-            />
-            <div
-              aria-hidden
-              style={{
-                width: 1,
-                height: 16,
-                background: theme.stroke.secondary,
-                flexShrink: 0,
-              }}
-            />
-            <RegionFilter
-              value={filter}
-              onChange={(next) => {
-                setFilter(next);
-                setFocusCity(null);
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      <Divider />
-
       <div className={dock === "side" ? "itinerary-shell is-side" : "itinerary-shell"}>
       <div className="itinerary-main">
       <div className="map-with-picker">
@@ -2533,6 +2431,90 @@ export default function RoadmapApp() {
         onAddCity={(id) => persist(insertTaking(active, active.length, id))}
         onFocusCity={setFocusCity}
       />
+      <div className="picker-col">
+      <div
+        className="search-bar picker-search"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          height: theme.control.height,
+          background: theme.bg.elevated,
+          padding: "0 6px 0 10px",
+        }}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("button")) return;
+          searchRef.current?.focus();
+        }}
+      >
+        <span style={{ display: "flex", flexShrink: 0, pointerEvents: "none" }}>
+          <Glyph kind="search" color={theme.text.tertiary} size={14} />
+        </span>
+        <input
+          ref={searchRef}
+          type="search"
+          value={query}
+          placeholder="Buscar"
+          aria-label="Buscar ciudad"
+          onChange={(event) => {
+            setQuery(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setQuery("");
+              setFocusCity(null);
+              return;
+            }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              const index = pool.findIndex((city) => city.id === focusCity);
+              const next =
+                event.key === "ArrowDown"
+                  ? pool[index < 0 ? 0 : Math.min(pool.length - 1, index + 1)]
+                  : pool[index < 0 ? pool.length - 1 : Math.max(0, index - 1)];
+              if (next) setFocusCity(next.id);
+              pickerRef.current?.focus();
+              return;
+            }
+            if (event.key !== "Enter") return;
+            const chosen =
+              (focusCity && pool.find((city) => city.id === focusCity && !active.some((stop) => stop.city === city.id))) ||
+              pool.find((city) => !active.some((stop) => stop.city === city.id));
+            if (!chosen) return;
+            persist(insertTaking(active, active.length, chosen.id));
+            setQuery("");
+            setFocusCity(null);
+          }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: "100%",
+            border: "none",
+            background: "transparent",
+            color: theme.text.primary,
+            padding: 0,
+            font: "inherit",
+            fontSize: theme.type.sm,
+            outline: "none",
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            width: 1,
+            height: 16,
+            background: theme.stroke.secondary,
+            flexShrink: 0,
+          }}
+        />
+        <RegionFilter
+          value={filter}
+          onChange={(next) => {
+            setFilter(next);
+            setFocusCity(null);
+          }}
+        />
+      </div>
       <CityPicker
         cities={pool}
         activeIds={new Set(active.map((stop) => stop.city))}
@@ -2566,6 +2548,7 @@ export default function RoadmapApp() {
           if (next) setGrab(next);
         }}
       />
+      </div>
       </div>
 
       <Divider />
