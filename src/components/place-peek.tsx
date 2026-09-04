@@ -427,47 +427,54 @@ export function PlacePeek({
     >
       <div className="place-peek-media">
         {hero ? (
-          <img
-            key={hero}
-            src={hero}
-            alt=""
-            className={`place-peek-photo${photoOn ? " is-ready" : ""}`}
-            referrerPolicy="no-referrer"
-            onLoad={() => setPhotoOn(true)}
-          />
+          <>
+            <img
+              key={hero}
+              src={hero}
+              alt=""
+              className={`place-peek-photo${photoOn ? " is-ready" : ""}`}
+              referrerPolicy="no-referrer"
+              onLoad={() => setPhotoOn(true)}
+            />
+            <div className="place-peek-frost" aria-hidden>
+              <img
+                src={hero}
+                alt=""
+                className={`place-peek-frost-photo${photoOn ? " is-ready" : ""}`}
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </>
         ) : null}
+        <div className="place-peek-shade" aria-hidden />
         <div className="place-peek-glass">
-          <div
-            className="place-peek-fade bg-neutral-950/40 backdrop-blur-md backdrop-saturate-125 [mask-image:linear-gradient(to_top,rgb(0_0_0)_0%,rgb(0_0_0)_45%,rgba(0,0,0,0.3)_75%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,rgb(0_0_0)_0%,rgb(0_0_0)_45%,rgba(0,0,0,0.3)_75%,transparent_100%)]"
-            aria-hidden
-          />
           <div className="place-peek-copy">
             {stateLabel(place.state) !== place.title ? (
               <p className="place-peek-kicker">{stateLabel(place.state)}</p>
             ) : null}
             <h3 className="place-peek-title">{place.title}</h3>
           </div>
+          <div className="place-peek-actions">
+            {canAdd ? (
+              <button
+                type="button"
+                className="place-peek-cta is-add"
+                disabled={added}
+                onClick={onAdd}
+              >
+                {added ? "Ya está en el viaje" : "Agregar al viaje"}
+              </button>
+            ) : null}
+            <a
+              className="place-peek-cta is-info"
+              href={youtubeSearchUrl(place)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Más información
+            </a>
+          </div>
         </div>
-      </div>
-      <div className="place-peek-actions">
-        {canAdd ? (
-          <button
-            type="button"
-            className="place-peek-cta is-add"
-            disabled={added}
-            onClick={onAdd}
-          >
-            {added ? "Ya está en el viaje" : "Agregar al viaje"}
-          </button>
-        ) : null}
-        <a
-          className="place-peek-cta is-info"
-          href={youtubeSearchUrl(place)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Más información
-        </a>
       </div>
     </aside>
   );

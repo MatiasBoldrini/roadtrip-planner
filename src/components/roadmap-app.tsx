@@ -730,7 +730,7 @@ function formatHours(value: number) {
 }
 
 function formatRange(low: number, high: number) {
-  return low === high ? usd(low) : `${usd(low)}–${usd(high)}`;
+  return usd((low + high) / 2);
 }
 
 function stayCostLabel(city: City | undefined, days: number) {
@@ -920,7 +920,7 @@ function RegionFilter({
   }, [open]);
 
   return (
-    <div ref={root} style={{ position: "relative", flexShrink: 0 }}>
+    <div ref={root} style={{ position: "relative", alignSelf: "start" }}>
       <button
         type="button"
         className="ui-pill is-inline"
@@ -931,20 +931,20 @@ function RegionFilter({
         style={{
           display: "inline-flex",
           alignItems: "center",
-          gap: 4,
+          gap: 6,
           boxSizing: "border-box",
-          minHeight: 22,
-          height: 22,
+          minHeight: 40,
+          height: 40,
           border: "none",
-          borderRadius: theme.control.radius,
-          padding: "0 8px 0 6px",
+          borderRadius: 10,
+          padding: "0 12px 0 10px",
           color: theme.text.primary,
           font: "inherit",
           fontSize: theme.type.sm,
           cursor: "pointer",
         }}
       >
-        <Glyph kind="filter" color={theme.text.tertiary} size={12} />
+        <Glyph kind="filter" color={theme.text.tertiary} size={14} />
         {REGION_OPTIONS.find((option) => option.id === selected)?.label ?? "Costa Este"}
       </button>
       {open ? (
@@ -2483,27 +2483,20 @@ export default function RoadmapApp() {
       <div className="picker-col">
       <div
         className="search-bar picker-search"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          height: theme.control.height,
-          background: theme.bg.elevated,
-          padding: "0 6px 0 10px",
-        }}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest("button")) return;
           searchRef.current?.focus();
         }}
       >
+        <label className="picker-search-field">
         <span style={{ display: "flex", flexShrink: 0, pointerEvents: "none" }}>
-          <Glyph kind="search" color={theme.text.tertiary} size={14} />
+          <Glyph kind="search" color={theme.text.tertiary} size={16} />
         </span>
         <input
           ref={searchRef}
           type="search"
           value={query}
-          placeholder="Buscar"
+          placeholder="Buscar ciudad"
           aria-label="Buscar ciudad"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -2543,19 +2536,11 @@ export default function RoadmapApp() {
             color: theme.text.primary,
             padding: 0,
             font: "inherit",
-            fontSize: theme.type.sm,
+            fontSize: 14,
             outline: "none",
           }}
         />
-        <div
-          aria-hidden
-          style={{
-            width: 1,
-            height: 16,
-            background: theme.stroke.secondary,
-            flexShrink: 0,
-          }}
-        />
+        </label>
         <RegionFilter
           value={filter}
           onChange={(next) => {
