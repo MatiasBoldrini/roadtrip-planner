@@ -92,6 +92,10 @@ input {
   background: #f0f0f0;
 }
 
+.usa-map {
+  position: relative;
+}
+
 .usa-map .leaflet-cities-pane {
   z-index: 650;
 }
@@ -113,6 +117,10 @@ input {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.usa-map .usa-city-mark:not(.is-idle) {
+  cursor: pointer;
 }
 
 .usa-map .usa-city-mark.is-idle {
@@ -189,6 +197,125 @@ input {
   color: #8a8a8a;
   font-weight: 600;
   letter-spacing: 0.04em;
+}
+
+.usa-map .leaflet-overlay-pane canvas {
+  pointer-events: none;
+}
+
+.usa-map .leaflet-interactive {
+  cursor: pointer;
+}
+
+.place-peek {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 800;
+  width: min(320px, calc(100% - 28px));
+  overflow: hidden;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 16%),
+    0 1px 0 rgb(255 255 255 / 70%) inset;
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+  animation: peek-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.place-peek-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 86%);
+  color: #171717;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+}
+
+.place-peek-hero {
+  position: relative;
+  height: 148px;
+  background: #e8e8e8;
+}
+
+.place-peek-thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px 4px 0;
+}
+
+.place-peek-thumb {
+  position: relative;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #ececec;
+}
+
+.place-peek-photo {
+  object-fit: cover;
+}
+
+.place-peek-copy {
+  padding: 12px 14px 14px;
+}
+
+.place-peek-kicker {
+  margin: 0 0 2px;
+  color: #8a8a8a;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.place-peek-title {
+  margin: 0;
+  color: #171717;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.place-peek-sub {
+  margin: 4px 0 0;
+  color: #5c5c5c;
+  font-size: 13px;
+}
+
+.place-peek-blurb {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin: 8px 0 0;
+  color: #5c5c5c;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 ::view-transition {

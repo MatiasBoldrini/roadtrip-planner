@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import {
   GeoJSON,
@@ -15,6 +15,13 @@ import type { FeatureCollection, Geometry } from "geojson";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import statesTopo from "us-atlas/states-10m.json";
 import panamaLand from "@/data/panama.json";
+import {
+  PlacePeek,
+  type PlacePick,
+  stateLabel,
+  wikiTitleForCity,
+  wikiTitleForState,
+} from "@/components/place-peek";
 import { theme } from "@/lib/theme";
 import "leaflet/dist/leaflet.css";
 
@@ -164,9 +171,112 @@ const STATE_STYLE = {
   fillOpacity: 0.9,
 };
 
-const MAP_RENDERER = L.canvas({
+const STATE_HOVER = {
+  color: theme.stroke.secondary,
+  weight: 1,
+  fillColor: theme.accent.primary,
+  fillOpacity: 0.14,
+};
+
+const STATE_PICKED = {
+  color: theme.accent.primary,
+  weight: 1.6,
+  fillColor: theme.accent.primary,
+  fillOpacity: 0.35,
+};
+
+const STATE_RENDERER = L.svg({
   padding: 0.5,
 });
+
+function styleForState(name?: string, picked?: string | null) {
+  if (name && picked === name) return STATE_PICKED;
+  return STATE_STYLE;
+}
+
+function featureName(layer: L.Layer) {
+  const feature = (layer as L.GeoJSON).feature as { properties?: { name?: string } } | undefined;
+  return feature?.properties?.name;
+}
+
+function StatesLayer({
+  picked,
+  onPick,
+}: {
+  picked: string | null;
+  onPick: (name: string) => void;
+}) {
+  const ref = useRef<L.GeoJSON | null>(null);
+  const pickedRef = useRef(picked);
+  pickedRef.current = picked;
+
+  useEffect(() => {
+    const layer = ref.current;
+    if (!layer) return;
+    layer.eachLayer((child) => {
+      if (child instanceof L.Path) child.setStyle(styleForState(featureName(child), picked));
+    });
+  }, [picked]);
+
+  return (
+    <GeoJSON
+      ref={ref}
+      data={states}
+      renderer={STATE_RENDERER}
+      bubblingMouseEvents={false}
+      style={(feature) => styleForState(feature?.properties?.name, picked)}
+      onEachFeature={(feature, layer) => {
+        const name = feature.properties.name;
+        const label = () => {
+          const el = layer instanceof L.Path ? layer.getElement() : null;
+          if (!el) return;
+          el.setAttribute("role", "button");
+          el.setAttribute("aria-label", stateLabel(name));
+          el.setAttribute("tabindex", "0");
+        };
+        layer.on({
+          add: label,
+          mouseover: () => {
+            if (!(layer instanceof L.Path)) return;
+            if (pickedRef.current === name) return;
+            layer.setStyle(STATE_HOVER);
+            layer.bringToFront();
+          },
+          mouseout: () => {
+            if (!(layer instanceof L.Path)) return;
+            layer.setStyle(styleForState(name, pickedRef.current));
+          },
+          click: (event) => {
+            L.DomEvent.stop(event);
+            onPick(name);
+          },
+        });
+        label();
+      }}
+    />
+  );
+}
+
+function DismissOnMap({
+  enabled,
+  onDismiss,
+  skipRef,
+}: {
+  enabled: boolean;
+  onDismiss: () => void;
+  skipRef: { current: boolean };
+}) {
+  useMapEvents({
+    click: () => {
+      if (skipRef.current) {
+        skipRef.current = false;
+        return;
+      }
+      if (enabled) onDismiss();
+    },
+  });
+  return null;
+}
 
 type LatLon = [number, number];
 
@@ -243,6 +353,7 @@ function HopLine({
   return (
     <>
       <Polyline
+        interactive={false}
         positions={curve}
         pathOptions={{
           color: "#ffffff",
@@ -253,6 +364,7 @@ function HopLine({
         }}
       />
       <Polyline
+        interactive={false}
         positions={curve}
         pathOptions={{
           color: theme.category.orange,
@@ -331,6 +443,7 @@ function HotMarker({
   pane,
   zIndexOffset,
   interactive = false,
+  onClick,
 }: {
   hot: boolean;
   icon: L.DivIcon;
@@ -338,6 +451,7 @@ function HotMarker({
   pane?: string;
   zIndexOffset?: number;
   interactive?: boolean;
+  onClick?: () => void;
 }) {
   const ref = useRef<L.Marker | null>(null);
   const apply = () => {
@@ -353,8 +467,16 @@ function HotMarker({
       position={position}
       icon={icon}
       zIndexOffset={hot ? (zIndexOffset ?? 0) + 80 : zIndexOffset}
-      interactive={interactive}
-      eventHandlers={{ add: apply }}
+      interactive={interactive || Boolean(onClick)}
+      eventHandlers={{
+        add: apply,
+        click: onClick
+          ? (event) => {
+              L.DomEvent.stop(event);
+              onClick();
+            }
+          : undefined,
+      }}
     />
   );
 }
@@ -427,6 +549,33 @@ export default function UsaMapInner({
     stops.map((stop) => stop.city),
   );
 
+  const [picked, setPicked] = useState<PlacePick | null>(null);
+  const skipDismiss = useRef(false);
+
+  const pickState = useCallback((name: string) => {
+    skipDismiss.current = true;
+    setPicked((prev) => {
+      if (prev && prev.state === name && prev.wiki === wikiTitleForState(name)) return null;
+      return {
+        state: name,
+        title: stateLabel(name),
+        subtitle: name === "Panama" ? "Centroamérica" : "Estados Unidos",
+        wiki: wikiTitleForState(name),
+      };
+    });
+  }, []);
+
+  const pickCity = useCallback((city: MapPlace) => {
+    skipDismiss.current = true;
+    const state = STATE_BY_CITY[city.id] ?? city.state;
+    setPicked({
+      state,
+      title: city.name,
+      subtitle: stateLabel(state) === city.name ? "En el itinerario" : stateLabel(state),
+      wiki: wikiTitleForCity(city.id, state),
+    });
+  }, []);
+
   return (
     <div
       className="usa-map"
@@ -442,8 +591,6 @@ export default function UsaMapInner({
         bounds={startBounds}
         scrollWheelZoom
         attributionControl={false}
-        preferCanvas
-        renderer={MAP_RENDERER}
         zoomSnap={0}
         zoomDelta={0.5}
         wheelPxPerZoomLevel={80}
@@ -452,7 +599,8 @@ export default function UsaMapInner({
         maxZoom={8}
       >
         <MapPanes />
-        <GeoJSON data={states} style={STATE_STYLE} />
+        <StatesLayer picked={picked?.state ?? null} onPick={pickState} />
+        <DismissOnMap enabled={Boolean(picked)} onDismiss={() => setPicked(null)} skipRef={skipDismiss} />
         <Camera tripKey={tripKey} focusId={focusId} />
         {hops.map((hop, index) => (
           <HopLine
@@ -487,10 +635,14 @@ export default function UsaMapInner({
               icon={cityIcon(index + 1, city.name, gateway ? AIRPORT[city.id] : undefined)}
               hot={focusId === city.id}
               zIndexOffset={200 + index * 10}
+              onClick={() => pickCity(city)}
             />
           );
         })}
       </MapContainer>
+      {picked ? (
+        <PlacePeek key={`${picked.state}-${picked.wiki}`} place={picked} onClose={() => setPicked(null)} />
+      ) : null}
     </div>
   );
 }
