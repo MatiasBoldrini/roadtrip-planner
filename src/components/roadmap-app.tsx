@@ -2067,6 +2067,8 @@ function CityPicker({
   onDragStart: (city: City, event: Ptr) => void;
 }) {
   const theme = useHostTheme();
+  const pendingDrag = useRef<{ city: City; x: number; y: number } | null>(null);
+  const didDrag = useRef(false);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -2135,17 +2137,31 @@ function CityPicker({
               id={`city-opt-${city.id}`}
               role="option"
               aria-selected={active}
-              aria-label={used ? `${city.name}, ya está en el viaje` : `Sumar ${city.name}`}
+              aria-label={used ? `${city.name}, ya está en el viaje` : city.name}
               className={`city-picker-row${active ? " is-active" : ""}${used ? " is-used" : ""}`}
-              onPointerEnter={() => onSelect(city.id)}
               onPointerDown={(event: Ptr) => {
                 if (used) return;
-                onDragStart(city, event);
+                didDrag.current = false;
+                pendingDrag.current = { city, x: event.clientX, y: event.clientY };
+              }}
+              onPointerMove={(event: Ptr) => {
+                const pending = pendingDrag.current;
+                if (!pending || pending.city.id !== city.id || used) return;
+                if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) < 8) return;
+                pendingDrag.current = null;
+                didDrag.current = true;
+                onDragStart(pending.city, event);
                 event.currentTarget.setPointerCapture(event.pointerId);
               }}
+              onPointerUp={() => {
+                pendingDrag.current = null;
+              }}
               onClick={() => {
-                if (used) return;
-                onAdd(city.id);
+                if (didDrag.current) {
+                  didDrag.current = false;
+                  return;
+                }
+                onSelect(active ? null : city.id);
               }}
               style={{
                 display: "flex",
@@ -2155,7 +2171,7 @@ function CityPicker({
                 padding: "12px 14px",
                 borderBottom: index === cities.length - 1 ? "none" : `1px solid ${theme.stroke.tertiary}`,
                 color: used ? theme.text.tertiary : theme.text.primary,
-                cursor: used ? "default" : grabbing ? "grabbing" : "pointer",
+                cursor: grabbing ? "grabbing" : "pointer",
                 opacity: grabbing ? 0.35 : 1,
               }}
             >
@@ -2166,7 +2182,25 @@ function CityPicker({
               {used ? (
                 <span style={{ fontSize: 11, color: theme.text.tertiary }}>En viaje</span>
               ) : (
-                <Glyph kind="plus" color={theme.text.tertiary} size={12} />
+                <button
+                  type="button"
+                  aria-label={`Sumar ${city.name}`}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAdd(city.id);
+                  }}
+                  style={{
+                    display: "grid",
+                    placeItems: "center",
+                    padding: 0,
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Glyph kind="plus" color={theme.text.tertiary} size={12} />
+                </button>
               )}
               {used && city.id !== "ny" ? (
                 <button
@@ -2225,6 +2259,21 @@ export default function RoadmapApp() {
   const [focusCity, setFocusCity] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [lifted, setLifted] = useState(false);
+
+  useEffect(() => {
+    if (!focusCity) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(".place-peek")) return;
+      if (target.closest(".picker-col")) return;
+      if (target.closest(".usa-city-mark")) return;
+      if (target.closest(".leaflet-interactive")) return;
+      setFocusCity(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [focusCity]);
 
   useEffect(() => {
     if (!grab) {

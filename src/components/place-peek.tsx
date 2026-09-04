@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 
 export type PlacePick = {
   state: string;
@@ -428,66 +427,47 @@ export function PlacePeek({
     >
       <div className="place-peek-media">
         {hero ? (
-          <Image
+          <img
             key={hero}
             src={hero}
             alt=""
-            fill
-            sizes="196px"
             className={`place-peek-photo${photoOn ? " is-ready" : ""}`}
             referrerPolicy="no-referrer"
-            priority
-            unoptimized
             onLoad={() => setPhotoOn(true)}
           />
         ) : null}
-        <div className="place-peek-fade" aria-hidden />
-        <div className="place-peek-copy">
-          {stateLabel(place.state) !== place.title ? (
-            <p className="place-peek-kicker">{stateLabel(place.state)}</p>
-          ) : null}
-          <h3 className="place-peek-title">{place.title}</h3>
-          {place.subtitle && place.subtitle !== place.title && place.subtitle !== stateLabel(place.state) ? (
-            <p className="place-peek-sub">{place.subtitle}</p>
-          ) : null}
+        <div className="place-peek-glass">
+          <div
+            className="place-peek-fade bg-neutral-950/40 backdrop-blur-md backdrop-saturate-125 [mask-image:linear-gradient(to_top,rgb(0_0_0)_0%,rgb(0_0_0)_45%,rgba(0,0,0,0.3)_75%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,rgb(0_0_0)_0%,rgb(0_0_0)_45%,rgba(0,0,0,0.3)_75%,transparent_100%)]"
+            aria-hidden
+          />
+          <div className="place-peek-copy">
+            {stateLabel(place.state) !== place.title ? (
+              <p className="place-peek-kicker">{stateLabel(place.state)}</p>
+            ) : null}
+            <h3 className="place-peek-title">{place.title}</h3>
+          </div>
         </div>
+      </div>
+      <div className="place-peek-actions">
         {canAdd ? (
           <button
             type="button"
-            className="place-peek-orb"
+            className="place-peek-cta is-add"
             disabled={added}
-            aria-label={added ? "Ya está en el viaje" : "Agregar al viaje"}
             onClick={onAdd}
           >
-            {added ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M5 12.5 10 17.5 19 7.5"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M12 5v14M5 12h14"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            )}
+            {added ? "Ya está en el viaje" : "Agregar al viaje"}
           </button>
         ) : null}
         <a
-          className="place-peek-hit"
+          className="place-peek-cta is-info"
           href={youtubeSearchUrl(place)}
           target="_blank"
           rel="noreferrer"
-          aria-label={`Ver más info de ${place.title}`}
-        />
+        >
+          Más información
+        </a>
       </div>
     </aside>
   );

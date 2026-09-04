@@ -209,10 +209,12 @@ function StatesLayer({
   hovered,
   onHover,
   onLeave,
+  onClick,
 }: {
   hovered: string | null;
   onHover: (name: string, point: MapPoint) => void;
   onLeave: () => void;
+  onClick?: (name: string) => void;
 }) {
   const ref = useRef<L.GeoJSON | null>(null);
   const hoveredRef = useRef(hovered);
@@ -248,7 +250,7 @@ function StatesLayer({
             }
             onHover(name, pointFrom(event));
           },
-          mousemove: (event) => onHover(name, pointFrom(event)),
+          click: () => onClick?.(name),
           mouseout: () => {
             if (layer instanceof L.Path) {
               layer.setStyle(styleForState(name, hoveredRef.current));
@@ -402,7 +404,7 @@ function StateNames({
   );
 }
 
-function MapChrome({ onLeave }: { onLeave: () => void }) {
+function MapChrome() {
   const map = useMap();
   const syncZoom = () => {
     const root = map.getContainer().closest(".usa-map");
@@ -411,11 +413,7 @@ function MapChrome({ onLeave }: { onLeave: () => void }) {
   useEffect(() => {
     map.scrollWheelZoom.enable();
     syncZoom();
-    const root = map.getContainer().closest(".usa-map");
-    if (!(root instanceof HTMLElement)) return;
-    root.addEventListener("mouseleave", onLeave);
-    return () => root.removeEventListener("mouseleave", onLeave);
-  }, [map, onLeave]);
+  }, [map]);
   useMapEvents({
     zoom: syncZoom,
     zoomend: syncZoom,
@@ -588,6 +586,7 @@ function HotMarker({
   interactive = false,
   onHover,
   onLeave,
+  onClick,
 }: {
   hot: boolean;
   icon: L.DivIcon;
@@ -597,6 +596,7 @@ function HotMarker({
   interactive?: boolean;
   onHover?: (point: MapPoint) => void;
   onLeave?: () => void;
+  onClick?: () => void;
 }) {
   const ref = useRef<L.Marker | null>(null);
   const apply = () => {
@@ -612,7 +612,7 @@ function HotMarker({
       position={position}
       icon={icon}
       zIndexOffset={hot ? (zIndexOffset ?? 0) + 80 : zIndexOffset}
-      interactive={interactive || Boolean(onHover)}
+      interactive={interactive || Boolean(onHover || onClick)}
       eventHandlers={{
         add: apply,
         mouseover: onHover
@@ -621,7 +621,12 @@ function HotMarker({
               onHover(pointFrom(event));
             }
           : undefined,
-        mousemove: onHover ? (event) => onHover(pointFrom(event)) : undefined,
+        click: onClick
+          ? (event) => {
+              L.DomEvent.stop(event);
+              onClick();
+            }
+          : undefined,
         mouseout: onLeave,
       }}
     />
@@ -679,16 +684,20 @@ function FocusFromList({
 }: {
   focusId?: string | null;
   cities: MapPlace[];
-  onShow: (city: MapPlace, point: MapPoint) => void;
+  onShow: (city: MapPlace | null) => void;
 }) {
-  const map = useMap();
   useEffect(() => {
-    if (!focusId) return;
+    if (!focusId) {
+      onShow(null);
+      return;
+    }
     const city = cities.find((item) => item.id === focusId);
-    if (!city) return;
-    const point = map.latLngToContainerPoint(L.latLng(city.lat, city.lon));
-    onShow(city, { x: point.x, y: point.y });
-  }, [cities, focusId, map, onShow]);
+    if (!city) {
+      onShow(null);
+      return;
+    }
+    onShow(city);
+  }, [cities, focusId, onShow]);
   return null;
 }
 
@@ -737,14 +746,13 @@ export default function UsaMapInner({
   );
 
   const [hovered, setHovered] = useState<PlacePick | null>(null);
-  const hideTimer = useRef<number | null>(null);
 
-  const hoverPlace = useCallback((place: PlacePick) => {
-    prefetchPlaceMedia(place.wiki);
-    if (hideTimer.current) {
-      window.clearTimeout(hideTimer.current);
-      hideTimer.current = null;
+  const showPlace = useCallback((place: PlacePick | null) => {
+    if (!place) {
+      setHovered(null);
+      return;
     }
+    prefetchPlaceMedia(place.wiki);
     setHovered((prev) => {
       if (prev && prev.state === place.state && prev.wiki === place.wiki && prev.cityId === place.cityId) {
         return prev;
@@ -753,43 +761,14 @@ export default function UsaMapInner({
     });
   }, []);
 
-  const stayPlace = useCallback(() => {
-    if (hideTimer.current) {
-      window.clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-    }
-  }, []);
-
-  const leavePlace = useCallback(() => {
-    if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    hideTimer.current = window.setTimeout(() => {
-      hideTimer.current = null;
-      setHovered((prev) => {
-        if (focusId && prev?.cityId === focusId) return prev;
-        return null;
-      });
-    }, 180);
-  }, [focusId]);
-
-  const hoverState = useCallback(
-    (name: string, _point: MapPoint) => {
-      const city = firstCityInState(name, cities, chosen);
-      hoverPlace({
-        state: name,
-        title: stateLabel(name),
-        subtitle: name === "Panama" ? "Centroamérica" : "Estados Unidos",
-        wiki: wikiTitleForState(name),
-        cityId: city?.id,
-      });
-    },
-    [cities, chosen, hoverPlace],
-  );
-
-  const hoverCity = useCallback(
-    (city: MapPlace, _point: MapPoint) => {
+  const showCity = useCallback(
+    (city: MapPlace | null) => {
+      if (!city) {
+        showPlace(null);
+        return;
+      }
       const state = STATE_BY_CITY[city.id] ?? city.state;
-      onFocusCity?.(city.id);
-      hoverPlace({
+      showPlace({
         state,
         title: city.name,
         subtitle: stateLabel(state) === city.name ? "En el itinerario" : stateLabel(state),
@@ -797,14 +776,32 @@ export default function UsaMapInner({
         cityId: city.id,
       });
     },
-    [hoverPlace, onFocusCity],
+    [showPlace],
   );
 
-  useEffect(() => {
-    return () => {
-      if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    };
-  }, []);
+  const prefetchState = useCallback(
+    (name: string) => {
+      const city = firstCityInState(name, cities, chosen);
+      prefetchPlaceMedia(city ? wikiTitleForCity(city.id, name) : wikiTitleForState(name));
+    },
+    [cities, chosen],
+  );
+
+  const pinState = useCallback(
+    (name: string) => {
+      const city = firstCityInState(name, cities, chosen);
+      if (!city) return;
+      onFocusCity?.(focusId === city.id ? null : city.id);
+    },
+    [cities, chosen, focusId, onFocusCity],
+  );
+
+  const pinCity = useCallback(
+    (city: MapPlace) => {
+      onFocusCity?.(focusId === city.id ? null : city.id);
+    },
+    [focusId, onFocusCity],
+  );
 
   return (
     <div
@@ -828,16 +825,17 @@ export default function UsaMapInner({
         maxZoom={8}
       >
         <MapPanes />
-        <MapChrome onLeave={leavePlace} />
+        <MapChrome />
         <StatesLayer
           hovered={hovered?.state ?? null}
-          onHover={hoverState}
-          onLeave={leavePlace}
+          onHover={(name) => prefetchState(name)}
+          onLeave={() => {}}
+          onClick={pinState}
         />
         <GeoJSON data={states} pane="state-borders" interactive={false} style={STATE_BORDER} />
         <StateNames picked={hovered?.state ?? null} allow={labeledStates} />
         <Camera tripKey={tripKey} focusId={focusId} />
-        <FocusFromList focusId={focusId} cities={cities} onShow={hoverCity} />
+        <FocusFromList focusId={focusId} cities={cities} onShow={showCity} />
         {hops.map((hop, index) => (
           <HopLine
             key={`${index}-${hop.from.id}-${hop.to.id}`}
@@ -858,8 +856,10 @@ export default function UsaMapInner({
               icon={idleIcons.get(city.id) ?? idleIcon(city.name)}
               hot={focusId === city.id}
               zIndexOffset={0}
-              onHover={(point) => hoverCity(city, point)}
-              onLeave={leavePlace}
+              onHover={() =>
+                prefetchPlaceMedia(wikiTitleForCity(city.id, STATE_BY_CITY[city.id] ?? city.state))
+              }
+              onClick={() => pinCity(city)}
             />
           );
         })}
@@ -873,8 +873,10 @@ export default function UsaMapInner({
               icon={cityIcon(index + 1, city.name, gateway ? AIRPORT[city.id] : undefined)}
               hot={focusId === city.id}
               zIndexOffset={200 + index * 10}
-              onHover={(point) => hoverCity(city, point)}
-              onLeave={leavePlace}
+              onHover={() =>
+                prefetchPlaceMedia(wikiTitleForCity(city.id, STATE_BY_CITY[city.id] ?? city.state))
+              }
+              onClick={() => pinCity(city)}
             />
           );
         })}
@@ -885,8 +887,6 @@ export default function UsaMapInner({
           canAdd={Boolean(hovered.cityId && onAddCity)}
           added={Boolean(hovered.cityId && chosen.has(hovered.cityId))}
           onAdd={hovered.cityId && onAddCity ? () => onAddCity(hovered.cityId as string) : undefined}
-          onEnter={stayPlace}
-          onLeave={leavePlace}
         />
       ) : null}
     </div>
